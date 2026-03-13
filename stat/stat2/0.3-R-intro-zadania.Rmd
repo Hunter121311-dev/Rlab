@@ -1,0 +1,83 @@
+---
+title: "Wprowadzenie do programowania w R"
+date: "Semestr letni 2022/23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+## Zadania
+
+Zadania oparte są na zbiorze danych `Auto` (który dostępny jest również
+w pakiecie `ISLR`). Należy (przy pomocy R) znaleźć poniższe informacje.
+Rozwiązanie ma mieć formę dokumentu R Markdown.
+
+# pobranie danych
+dane <- read.csv("C:/Users/damia/OneDrive/Dokumenty/Rlab/stat/stat2/Auto.csv")
+
+# wyświetlenie danych
+head(dane)
+
+1. Jakie jest średnie zużycie paliwa (`mpg`) wszystkich samochodów?
+
+mean(dane$mpg)
+
+1. Jakie jest średnie zużycie paliwa samochodów, które mają 4 cylindry?
+
+mean(dane$mpg[dane$cylinders == 4])
+
+1. Jaka jest mediana wagi (`weight`) wszystkich samochodów?
+
+median(dane$weight)
+
+1. Jakie jest średnie zużycie paliwa samochodów wyprodukowanych w roku 72?
+
+mean(dane$mpg[dane$year == 72])
+
+1. Jaka jest wariancja przyspieszenia (`acceleration`) wszystkich samochodów?
+
+var(dane$acceleration)
+
+1. Jaka jest wariancja przyspieszenia samochodów japońskich (`origin == 3`)?
+
+var(dane$acceleration[dane$origin == 3])
+
+1. Ile jest samochodów, których moc (`horsepower`) jest powyżej średniej?
+
+# zamiana "?" na NA
+dane$horsepower[dane$horsepower == "?"] <- NA
+
+# konwersja na typ liczbowy
+dane$horsepower <- as.numeric(dane$horsepower)
+
+# utworzenie kopii danych bez NA w kolumnie z mocą
+dane_bufor <- dane[!is.na(dane$horsepower), ]
+dane_bufor
+
+# liczba samochodów z mocą powyżej średniej
+sum(dane_bufor$horsepower > mean(dane_bufor$horsepower))
+
+1. Jaka jest maksymalna moc samochodów, których waga jest poniżej średniej?
+
+max(dane_bufor$horsepower[dane_bufor$weight > mean(dane_bufor$weight)])
+
+1. Ile jest samochodów, których zużycie paliwa jest poniżej średniej (czyli `mpg` 
+jest **powyżej** średniej)?
+
+sum(dane$mpg > mean(dane$mpg))
+
+1. Jaka jest minimalna liczba cylindrów samochodów, których zużycie paliwa jest 
+poniżej średniej?
+
+min(dane_bufor$cylinders[dane_bufor$mpg < mean(dane_bufor$mpg)])
+
+1. Ile jest samochodów o maksymalnej pojemności silnika (`displacement`)?
+
+sum(dane$displacement == max(dane$displacement))
+
+1. Jakie jest maksymalna waga (`weight`) samochodów, których pojemność silnika
+jest mniejsza od jej mediany?
+
+max(dane$weight[dane$displacement<median(dane$displacement)])
