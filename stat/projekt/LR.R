@@ -1,0 +1,5 @@
+dane <- read.csv("Rlab/stat/projekt/data/hel_hourly_10000_days.csv")
+head(dane)
+dane$datetime<-as.POSIXct(dane$datetime, format = "%Y-%m-%dT%H:%M")
+model <- lm(dane$surface_pressure ~ ., dane)
+summary(model)
