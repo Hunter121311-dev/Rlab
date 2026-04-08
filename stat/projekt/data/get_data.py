@@ -5,11 +5,11 @@ from datetime import date, timedelta
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 TIMEZONE = "Europe/Warsaw"
-OUTPUT_CSV = "hel_hourly_10000_days.csv"
+OUTPUT_CSV = "chalupy_hourly_10000_days.csv"
 
-# Hel, Polska
-LAT = 54.6089
-LON = 18.8013
+# Hel, Polska 
+LAT = 54.759871
+LON = 18.506432
 
 HOURLY_VARS = [
     "temperature_2m",
