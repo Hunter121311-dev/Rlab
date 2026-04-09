@@ -1,0 +1,354 @@
+---
+title: "Podstawowe metody klasyfikacji"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Dane
+
+W trakcie zajęć wykorzystywany będzie zbiór danych `Smarket` z pakietu `ISLR`.
+
+```{r}
+library(ISLR)
+head(Smarket)
+```
+
+Opisuje on zachowanie indeksu giełdowego S&P 500 przez kolejne dni od
+roku 2001 do roku 2005. Zmienna `Direction` jest czynnikiem o 2 poziomach
+podsumowującym kierunek zmiany indeksu w danym dniu, tzn. `Direction == "Up"`
+wtedy i tylko wtedy, gdy `Today >= 0`.
+
+```{r}
+all(
+  (Smarket$Direction == "Up" & Smarket$Today >= 0) | 
+  (Smarket$Direction == "Down" & Smarket$Today < 0)
+  )
+```
+
+## Regresja logistyczna
+
+Chcemy dopasować model regresji logistycznej
+żeby przewidzieć wartość `Direction` na podstawie zmiennych
+`Lag1`, ..., `Lag5` i `Volume`.
+
+```{r logistic}
+Smarket_logistic_fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                   family = binomial, data = Smarket)
+summary(Smarket_logistic_fit)
+```
+
+Do predykcji --- podobnie jak w regresji liniowej --- wykorzystywana jest
+funkcja `predict()`. Przy wartości parametru `type = "response"` funkcja zwraca
+przewidywane prawdopodobieństwa $P(Y = 1 | X)$ (a nie np. szanse logarytmiczne).
+
+```{r logisticPredictProbs}
+Smarket_logistic_probs <- predict(Smarket_logistic_fit, type = "response")
+head(Smarket_logistic_probs)
+```
+
+Warto się upewnić czy $Y = 1$ oznacza `Direction == "Up"`
+
+```{r logisticContrasts}
+contrasts(Smarket$Direction)
+```
+
+Ostatecznie przewidywane przypisanie do klas uzyskujemy stosując bayesowską
+regułę decyzyjną (*maksimum a posteriori*).
+
+```{r logisticClass}
+Smarket_logistic_predicted <- ifelse(Smarket_logistic_probs > 0.5, "Up", "Down")
+head(Smarket_logistic_predicted)
+```
+
+Do zobrazowania wyników klasyfikacji używamy tablicy pomyłek
+
+```{r logisticConfusionMatrix}
+Smarket_logistic_cm <- table(Smarket_logistic_predicted, Smarket$Direction)
+Smarket_logistic_cm
+```
+
+*Proporcję błędów* można policzyć następująco:
+
+```{r logisticErrorRate}
+mean(Smarket_logistic_predicted != Smarket$Direction)
+```
+
+#### Zadanie
+
+**Oblicz proporcję błędów na podstawie zawartości obiektu `Smarket_logistic_cm`.**
+
+```{r}
+sum(Smarket_logistic_cm[row(Smarket_logistic_cm) != col(Smarket_logistic_cm)]) /
+  sum(Smarket_logistic_cm)
+```
+
+### Estymacja testowej proporcji błędów
+
+Niestety powyższa proporcja błędów jest *treningową proporcją błędów*.
+Do estymacji *testowej proporcji błędów* zastosujemy podział dostępnych danych
+na:
+
+- zbiór uczący --- dane od 2001 do 2004 roku;
+
+- zbiór testowy --- dane z 2005 roku.
+
+```{r trainAndTestSets}
+train <- Smarket$Year < 2005
+Smarket_test <- Smarket[!train,]
+Direction_test <- Smarket$Direction[!train]
+```
+
+Regresję wykonujemy na podstawie zbioru uczącego
+
+```{r logisticTrain}
+Smarket_log_fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                   family = binomial, data = Smarket, subset = train)
+summary(Smarket_log_fit)
+```
+
+a otrzymany model wykorzystujemy do predykcji dla danych ze zbioru testowego
+
+```{r logisticPredictionTrain}
+Smarket_log_probs <- predict(Smarket_log_fit, Smarket_test, type = "response")
+Smarket_log_predicted <- ifelse(Smarket_log_probs > 0.5, "Up", "Down")
+table(Smarket_log_predicted, Direction_test)
+```
+
+#### Zadanie
+
+**Oblicz testową proporcję błędów dla powyższego zbioru testowego.**
+
+```{r}
+mean(Smarket_log_predicted != Direction_test)
+```
+
+Próbujemy uzyskać bardziej efektywny model eliminując najmniej istotne predyktory
+--- wszystkie mają słabe lub bardzo słabe $p$-wartości, ale najlepsze dwa
+to `Lag1` i `Lag2`.
+
+```{r logisticSmall}
+Smarket_log_best2_fit <- glm(Direction ~ Lag1 + Lag2, family = binomial, 
+                    data = Smarket, subset = train)
+summary(Smarket_log_best2_fit)
+```
+
+Predykcja dla małego modelu.
+
+```{r}
+Smarket_log_best2_probs <- predict(Smarket_log_best2_fit, Smarket_test, type = "response")
+Smarket_log_best2_predicted <- ifelse(Smarket_log_best2_probs > 0.5, "Up", "Down")
+table(Smarket_log_best2_predicted, Direction_test)
+```
+
+#### Zadanie
+
+**Oblicz testową proporcję błędów w tym przypadku**. 
+
+```{r}
+mean(Smarket_log_best2_predicted != Direction_test)
+```
+
+#### Zadanie
+
+**Dla porównania oblicz testową proporcję błędów modelu zerowego, który
+w tym przypadku zawsze przewiduje wzrost.**
+
+```{r}
+mean(rep("Up", length(Direction_test)) != Direction_test)
+```
+
+## LDA i QDA
+
+Funkcje `lda()` i `qda()` dopasowujące modele analizy dyskryminacyjnej
+są dostępne w pakiecie `MASS`.
+
+```{r}
+library(MASS)
+```
+
+### LDA
+
+W sytuacji jak poprzednio stosujemy LDA do klasyfikacji wyznaczonej przez
+`Direction` względem `Lag1` i `Lag2`.
+
+```{r lda}
+Smarket_lda_fit <- lda(Direction ~ Lag1 + Lag2, data = Smarket, subset = train)
+Smarket_lda_fit
+```
+
+Predykcję wykonuje funkcja `predict.lda()`. Zwraca ona listę, której komponentami
+są:
+
+- czynnik (factor) zawierający wartości przewidywanych klas: `class`, 
+
+- macierz prawdopodobieństw a posteriori: `posterior`
+
+- wektor (lub macierz) wartości liniowego dyskryminatora `x`.
+
+```{r ldaPredict}
+Smarket_lda_predicted <- predict(Smarket_lda_fit, Smarket_test)
+head(Smarket_lda_predicted$class)
+head(Smarket_lda_predicted$posterior)
+head(Smarket_lda_predicted$x)
+```
+
+Tabela pomyłek dla LDA.
+
+```{r}
+table(Smarket_lda_predicted$class, Direction_test)
+```
+
+#### Zadanie
+
+**Oblicz testową proporcję błędów dla LDA.**
+
+```{r}
+mean(Smarket_lda_predicted$class != Direction_test)
+```
+
+Maksymalne przewidywane prawdopodobieństwo wzrostu w 2005
+
+```{r ldaMaxProbUp}
+max(Smarket_lda_predicted$posterior[, 2])
+```
+
+Maksymalne przewidywane prawdopodobieństwo spadku w 2005
+
+```{r ldaMaxProbDown}
+max(Smarket_lda_predicted$posterior[, 1])
+```
+
+### QDA
+
+Ten sam problem z dyskryminatorem kwadratowym
+
+```{r qda}
+Smarket_qda_fit <- qda(Direction ~ Lag1 + Lag2, data = Smarket, subset = train)
+Smarket_qda_fit
+```
+
+Predykcja dla QDA
+
+```{r qdaPredict}
+Smarket_qda_predicted <- predict(Smarket_qda_fit, Smarket_test)
+table(Smarket_qda_predicted$class, Direction_test)
+```
+
+#### Zadanie
+
+**Oblicz testową proporcję błędów dla QDA.**
+
+```{r}
+mean(Smarket_qda_predicted$class != Direction_test)
+```
+
+## kNN
+
+Implementacja metody najbliższych sąsiadów dostępna jest w pakiecie `class`.
+
+```{r}
+library(class)
+```
+
+W tym przypadku nie ma jawnego etapu uczenia. Funkcja `class::knn()`
+od razu wykonuje predykcję. Zbiory danych muszą być dla tej funkcji specjalnie
+przygotowane --- musimy usunąć kolumny, które nie są predyktorami i wydzielić
+wektor wartości odpowiedzi dla elementów zbioru treningowego.
+
+```{r}
+train_set <- Smarket[train, c("Lag1", "Lag2")]
+test_set <- Smarket[!train, c("Lag1", "Lag2")]
+Direction_train <- Smarket$Direction[train]
+```
+
+Uczenie i predykcja dla $k = 1$ wykonywane są następująco.
+
+```{r knn}
+set.seed(2025)
+Smarket_knn_1 <- knn(train_set, test_set, Direction_train, k = 1)
+head(Smarket_knn_1)
+```
+
+Ze względu na to, że kNN rozstrzyga remisy losowo, dla zapewnienia powtarzalności
+wyników warto przed wywołaniem funkcji `knn()` zainicjalizować generator liczb
+pseudolosowych (`?set.seed`).
+
+Tabela pomyłek.
+
+```{r}
+table(Smarket_knn_1, Direction_test)
+```
+
+Testowa proporcja błędów dla kNN z $k = 1$ nie jest imponująca
+
+```{r knnError}
+mean(Smarket_knn_1 != Direction_test)
+```
+
+#### Zadanie
+
+**Oblicz testową proporcję błędów dla $k = 2, 3, 4, 5$. Dla której z tych
+wartości otrzymujemy najlepszy model?**
+
+```{r}
+set.seed(2025)
+
+Smarket_knn_2 <- knn(train_set, test_set, Direction_train, k = 2)
+Smarket_knn_3 <- knn(train_set, test_set, Direction_train, k = 3)
+Smarket_knn_4 <- knn(train_set, test_set, Direction_train, k = 4)
+Smarket_knn_5 <- knn(train_set, test_set, Direction_train, k = 5)
+
+c(
+  k2 = mean(Smarket_knn_2 != Direction_test),
+  k3 = mean(Smarket_knn_3 != Direction_test),
+  k4 = mean(Smarket_knn_4 != Direction_test),
+  k5 = mean(Smarket_knn_5 != Direction_test)
+)
+```
+
+#### Zadanie
+
+**Dla dziesiątej obserwacji testowej (czyli z 2005 roku) 
+wyznacz prawdopodobieństwo *spadku* 
+wartości indeksu wyznaczone przez**:
+
+* regresję logistyczną (model mały),
+
+* LDA (prawdopodobieństwo *a posteriori*),
+
+* QDA (prawdopodobieństwo *a posteriori*),
+
+* (*) kNN dla $k = 3$ (`?knn`).
+
+```{r}
+i <- 10
+
+# regresja logistyczna (mały model)
+logistic_prob_down <- 1 - Smarket_log_best2_probs[i]
+
+# LDA
+lda_prob_down <- Smarket_lda_predicted$posterior[i, "Down"]
+
+# QDA
+qda_prob_down <- Smarket_qda_predicted$posterior[i, "Down"]
+
+# kNN dla k = 3
+set.seed(2025)
+Smarket_knn_3_prob <- knn(train_set, test_set, Direction_train, k = 3, prob = TRUE)
+
+knn_prob_down <- ifelse(
+  Smarket_knn_3_prob[i] == "Down",
+  attr(Smarket_knn_3_prob, "prob")[i],
+  1 - attr(Smarket_knn_3_prob, "prob")[i]
+)
+
+c(
+  logistic = logistic_prob_down,
+  lda = lda_prob_down,
+  qda = qda_prob_down,
+  knn3 = knn_prob_down
+)
+```

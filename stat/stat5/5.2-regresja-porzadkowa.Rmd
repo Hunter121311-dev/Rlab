@@ -1,0 +1,93 @@
+---
+title: "Regresja porządkowa"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Regresja porządkowa
+
+Będziemy wykorzystywać dość popularny zbiór danych `Wine Quality` dostępny
+w [UC Irvine Machine Learning Repository](https://archive.ics.uci.edu).
+Dostęp do tego repozytorium ułatwia pakiet `ucimlrepo`.
+
+```{r}
+library(ucimlrepo)
+
+wq_file <- "wine_quality_uci.rds"
+if (!file.exists(wq_file)) {
+  wine_quality_uci <- fetch_ucirepo("Wine Quality")
+  saveRDS(wine_quality_uci, file = wq_file)
+} else {
+  wine_quality_uci <- readRDS(wq_file)
+}
+
+wine_quality <- wine_quality_uci$data$original
+head(wine_quality)
+```
+
+Dane muszą zostać nieco przekształcone. Zmienna `color` jest zmienną
+kategoryczną o 2 poziomach, więc przekształcamy ją na czynnik.
+
+```{r}
+wine_quality$color <- as.factor(wine_quality$color)
+head(wine_quality$color)
+```
+
+Zmienną objaśnianą będzie `quality`. Formalnie jest to zmienna liczbowa, ale
+przyjmuje wartości ze stosunkowo niewielkiego podzbioru liczb całkowitych,
+więc ma sens rozważanie jej jako czynnika, przy czym znaczący jest porządek
+wśród wartości, więc powinien to być czynnik uporządkowany.
+
+```{r}
+wine_quality$quality <- factor(wine_quality$quality, ordered = TRUE)
+head(wine_quality$quality)
+```
+
+Interesuje nas wpływ pozostałych zmiennych na `quality`. Regresja porządkowa
+dostępna jest w pakiecie `ordinal`.
+
+```{r}
+library(ordinal)
+wine_quality_fit <- clm(quality ~ ., data = wine_quality)
+summary(wine_quality_fit)
+```
+
+Jak widać, powyższy model ma problemy z identyfikowalnością związane z mocno
+zróżnicowanymi wartościami własnymi macierzy danych. Bardzo wysoki jest
+wskaźnik uwarunkowania macierzy Hessego (`cond.H`). Dokonujemy zatem
+przeskalowania (i scentrowania) kolumn numerycznych.
+
+```{r}
+wine_quality[1:11] <- scale(wine_quality[1:11])
+summary(wine_quality)
+```
+
+Powtarzamy regresję porządkową dla przeskalowanych danych.
+
+```{r}
+wine_quality_fit <- clm(quality ~ ., data = wine_quality)
+summary(wine_quality_fit)
+```
+
+Model bez nieistotnych predyktorów
+
+```{r}
+wine_quality_reduced_fit <- clm(quality ~ . - citric_acid, data = wine_quality)
+summary(wine_quality_reduced_fit)
+```
+
+### Zadanie
+
+Wykonaj analizę podobną do powyższej osobno dla białego i czerwonego wina.
+Czy wyniki istotnie się różnią?
+
+### Zadanie
+
+Wykonaj podobną analizę dla zbioru danych `Estimation of Obesity Levels [...]`.
+
+```{r, eval=FALSE}
+obesity_levels_uci <- fetch_ucirepo(id = 544)
+```

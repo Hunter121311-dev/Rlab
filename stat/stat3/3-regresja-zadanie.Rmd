@@ -1,0 +1,104 @@
+---
+title: "Regresja liniowa - zadanie"
+output: html_document
+---
+
+## Zadanie 1
+
+Dane umieszczone są w zbiorze `Hitters` z pakietu `ISLR`. Przed użyciem
+należy usunąć wiersze zawierające wartości brakujące
+
+```{r}
+library(ISLR)
+Hitters <- na.omit(Hitters)
+head(Hitters)
+```
+
+Przy pomocy modelu liniowego przeanalizuj zależność zarobków zawodników
+(zmienna `Salary`) od wszystkich pozostałych zmiennych. Dla każdego predyktora 
+stwierdź:
+
+- czy na podstawie modelu można uznać, że jest on predyktorem istotnym,
+
+- jeśli jest istotny, to jaki jest jego wpływ na zarobki (zwróć uwagę na
+różnicę w opisie wpływu predyktorów ilościowych i jakościowych).
+
+Przeanalizuj dopasowanie modelu do danych i stopień spełniania założeń modelu
+liniowego.
+
+## Rozwiązanie
+
+```{r}
+model <- lm(Hitters$Salary ~ ., Hitters)
+summary(model)
+```
+### Istotność predyktorów
+
+Na podstawie wartości p-value (< 0.06) za istotne predyktory uznajemy:
+
+- AtBat (p = 0.002)
+- Hits (p = 0.0018)
+- Walks (p < 0.001)
+- CWalks (p = 0.014)
+- Cruns (p = 0.053795)
+- DivisionW (p = 0.004)
+- PutOuts (p < 0.001)
+
+Predyktory nieistotne (p > 0.06) to m.in.: HmRun, Runs, RBI, Years, League, Errors, itd.
+
+### Interpretacja wpływu predyktorów
+
+Dla zmiennych ilościowych:
+
+- Hits: wzrost liczby hitów o 1 powoduje wzrost wynagrodzenia średnio o ok. 7.5 jednostki (przy pozostałych zmiennych stałych)
+- Walks: wzrost liczby spacerów o 1 zwiększa wynagrodzenie o ok. 6.23
+- PutOuts: wzrost o 1 powoduje wzrost wynagrodzenia o ok. 0.28
+
+- AtBat: wzrost liczby prób odbicia o 1 wiąże się ze spadkiem wynagrodzenia o ok. 1.98
+
+Dla zmiennych jakościowych:
+
+- DivisionW: zawodnicy z dywizji W zarabiają średnio o ok. 117 jednostek mniej niż zawodnicy z dywizji referencyjnej (E), przy pozostałych zmiennych stałych
+
+### Ocena dopasowania modelu
+
+Współczynnik determinacji R² wynosi 0.5461, co oznacza, że model wyjaśnia około 54.6% zmienności wynagrodzeń.
+
+Skorygowany R² wynosi 0.5106, co wskazuje na umiarkowane dopasowanie modelu.
+
+Test F (p-value < 2.2e-16) wskazuje, że model jako całość jest istotny statystycznie.
+
+## Zadanie 2
+
+Powtórz analizę z zadania 1 dla modelu skonstruowanego z pominięciem predyktorów,
+które w modelu pełnym okazały się nieistotne.
+
+### Wybór zmiennych do modelu
+
+Do nowego modelu wybrano zmienne istotne statystycznie w modelu pełnym:
+
+- AtBat
+- Hits
+- Walks
+- CWalks
+- CRuns
+- Division
+- PutOuts
+
+Celem było uproszczenie modelu przy zachowaniu jego jakości.
+
+## Rozwiązanie
+
+```{r}
+Hitters2 <- Hitters[, c("AtBat", "CWalks", "Hits", "Division", "PutOuts", "Walks", "CRuns", "Salary")]
+model2 <- lm(Hitters2$Salary ~ ., Hitters2 )
+summary(model2)
+```
+### Porównanie modeli
+
+Model zredukowany:
+
+- jest prostszy (mniej zmiennych)
+- zachowuje główne istotne zależności
+
+Adjusted R² modelu zredukowanego jest bardzo zbliżone do modelu pełnego (~0.51 vs ~0.50), co oznacza, że usunięcie nieistotnych zmiennych nie pogorszyło istotnie jakości dopasowania.
