@@ -1,4 +1,4 @@
-# konstruktory
+konstruktory
 
 make_LD <- function(data) {
   required_cols <- c("id", "visit", "room", "value")
