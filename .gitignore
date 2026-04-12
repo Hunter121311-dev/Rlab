@@ -4,4 +4,4 @@
 .Ruserdata
 *.Rproj
 *.zip
-/Rlab/R lang/lab5/household_power_consumption.txt
+R lang/lab5/household_power_consumption.txt
