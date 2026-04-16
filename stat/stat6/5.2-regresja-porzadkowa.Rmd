@@ -1,0 +1,301 @@
+---
+title: "Regresja porządkowa"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+options(width = 120)
+```
+
+## Regresja porządkowa
+
+Będziemy wykorzystywać dość popularny zbiór danych `Wine Quality` dostępny
+w [UC Irvine Machine Learning Repository](https://archive.ics.uci.edu).
+Dostęp do tego repozytorium ułatwia pakiet `ucimlrepo`.
+
+```{r}
+library(ucimlrepo)
+library(ordinal)
+
+wq_file <- "wine_quality_uci.rds"
+if (!file.exists(wq_file)) {
+  wine_quality_uci <- fetch_ucirepo("Wine Quality")
+  saveRDS(wine_quality_uci, file = wq_file)
+} else {
+  wine_quality_uci <- readRDS(wq_file)
+}
+
+wine_quality <- wine_quality_uci$data$original
+head(wine_quality)
+str(wine_quality)
+```
+
+Dane muszą zostać nieco przekształcone. Zmienna `color` jest zmienną
+kategoryczną o 2 poziomach, więc przekształcamy ją na czynnik.
+
+```{r}
+wine_quality$color <- as.factor(wine_quality$color)
+head(wine_quality$color)
+```
+
+Zmienną objaśnianą będzie `quality`. Formalnie jest to zmienna liczbowa, ale
+przyjmuje wartości ze stosunkowo niewielkiego podzbioru liczb całkowitych,
+więc ma sens rozważanie jej jako czynnika, przy czym znaczący jest porządek
+wśród wartości, więc powinien to być czynnik uporządkowany.
+
+```{r}
+wine_quality$quality <- factor(wine_quality$quality, ordered = TRUE)
+head(wine_quality$quality)
+summary(wine_quality$quality)
+```
+
+Interesuje nas wpływ pozostałych zmiennych na `quality`. Regresja porządkowa
+dostępna jest w pakiecie `ordinal`.
+
+```{r}
+wine_quality_fit_raw <- clm(quality ~ ., data = wine_quality)
+summary(wine_quality_fit_raw)
+```
+
+Jak widać, powyższy model może mieć problemy z identyfikowalnością związane z mocno
+zróżnicowanymi wartościami własnymi macierzy danych. Bardzo wysoki jest
+wskaźnik uwarunkowania macierzy Hessego (`cond.H`). Dokonujemy zatem
+przeskalowania (i scentrowania) kolumn numerycznych.
+
+```{r}
+numeric_cols_wq <- names(wine_quality)[sapply(wine_quality, is.numeric)]
+numeric_cols_wq
+wine_quality[numeric_cols_wq] <- scale(wine_quality[numeric_cols_wq])
+summary(wine_quality)
+```
+
+Powtarzamy regresję porządkową dla przeskalowanych danych.
+
+```{r}
+wine_quality_fit <- clm(quality ~ ., data = wine_quality)
+summary(wine_quality_fit)
+```
+
+Model bez nieistotnych predyktorów.
+
+```{r}
+wine_quality_reduced_fit <- clm(quality ~ . - citric_acid, data = wine_quality)
+summary(wine_quality_reduced_fit)
+AIC(wine_quality_fit, wine_quality_reduced_fit)
+```
+
+## Zadanie 1 - osobno dla białego i czerwonego wina
+
+Dzielimy dane na dwa podzbiory i wykonujemy analogiczną analizę. Po podziale
+zmienna `color` jest już stała, więc nie powinna być predyktorem w modelu.
+
+```{r}
+white_wine <- subset(wine_quality_uci$data$original, color == "white")
+red_wine   <- subset(wine_quality_uci$data$original, color == "red")
+
+prepare_wine_subset <- function(df) {
+  df$color <- NULL
+  df$quality <- factor(df$quality, ordered = TRUE)
+  num_cols <- names(df)[sapply(df, is.numeric)]
+  num_cols <- setdiff(num_cols, "quality")
+  df[num_cols] <- scale(df[num_cols])
+  df
+}
+
+white_wine <- prepare_wine_subset(white_wine)
+red_wine   <- prepare_wine_subset(red_wine)
+
+str(white_wine)
+str(red_wine)
+```
+
+### Model dla białego wina
+
+```{r}
+white_fit <- clm(quality ~ ., data = white_wine)
+summary(white_fit)
+```
+
+Dobieramy model zredukowany na podstawie nieistotnych predyktorów z modelu pełnego.
+W razie potrzeby można usunąć inną kombinację zmiennych po obejrzeniu wyników.
+
+```{r}
+coef_white <- coef(summary(white_fit))
+coef_white
+```
+
+```{r}
+white_reduced_fit <- clm(
+  quality ~ . - residual_sugar - free_sulfur_dioxide,
+  data = white_wine
+)
+summary(white_reduced_fit)
+AIC(white_fit, white_reduced_fit)
+```
+
+### Model dla czerwonego wina
+
+```{r}
+red_fit <- clm(quality ~ ., data = red_wine)
+summary(red_fit)
+```
+
+```{r}
+coef_red <- coef(summary(red_fit))
+coef_red
+```
+
+```{r}
+red_reduced_fit <- clm(
+  quality ~ . - residual_sugar - free_sulfur_dioxide,
+  data = red_wine
+)
+summary(red_reduced_fit)
+AIC(red_fit, red_reduced_fit)
+```
+
+### Porównanie modeli dla białego i czerwonego wina
+
+```{r}
+compare_coefs <- function(fit, model_name) {
+  out <- as.data.frame(coef(summary(fit)))
+  out$term <- rownames(out)
+  rownames(out) <- NULL
+  out$model <- model_name
+  out
+}
+
+wine_compare <- rbind(
+  compare_coefs(white_reduced_fit, "white"),
+  compare_coefs(red_reduced_fit, "red")
+)
+
+subset(wine_compare, !grepl("\\|", term))
+```
+
+```{r}
+data.frame(
+  model = c("white_full", "white_reduced", "red_full", "red_reduced"),
+  logLik = c(logLik(white_fit), logLik(white_reduced_fit), logLik(red_fit), logLik(red_reduced_fit)),
+  AIC = c(AIC(white_fit), AIC(white_reduced_fit), AIC(red_fit), AIC(red_reduced_fit))
+)
+```
+
+### Komentarz
+
+```{r, results='asis'}
+cat("Wnioski dla zbioru Wine Quality:\n\n")
+cat("1. Po rozdzieleniu danych na białe i czerwone wino modele nadal wskazują, że nie wszystkie predyktory są istotne.\n")
+cat("2. Współczynniki dla części zmiennych mają ten sam znak w obu modelach, ale ich siła i istotność mogą się różnić.\n")
+cat("3. Oznacza to, że mechanizm wpływu cech chemicznych na ocenę jakości nie jest identyczny dla obu typów wina.\n")
+cat("4. Szczególnie warto porównać istotność takich zmiennych jak alcohol, volatile_acidity, sulphates oraz density.\n")
+cat("5. Jeżeli dla danej zmiennej znak współczynnika lub jej istotność zmienia się między modelami, można uznać to za jakościową różnicę między winem białym i czerwonym.\n")
+```
+
+## Zadanie 2 - Estimation of Obesity Levels
+
+Wykonamy podobną analizę dla zbioru danych `Estimation of Obesity Levels Based On Eating Habits and Physical Condition`.
+
+```{r}
+ob_file <- "obesity_levels_uci.rds"
+if (!file.exists(ob_file)) {
+  obesity_levels_uci <- fetch_ucirepo(id = 544)
+  saveRDS(obesity_levels_uci, file = ob_file)
+} else {
+  obesity_levels_uci <- readRDS(ob_file)
+}
+
+obesity <- obesity_levels_uci$data$original
+head(obesity)
+str(obesity)
+summary(obesity)
+```
+
+Zmienną objaśnianą będzie poziom otyłości `NObeyesdad`, który ma naturalny porządek.
+Ustawiamy ją jako czynnik uporządkowany. Pozostałe zmienne kategoryczne zamieniamy na czynniki,
+a numeryczne skaluje.
+
+```{r}
+obesity$NObeyesdad <- factor(
+  obesity$NObeyesdad,
+  levels = c(
+    "Insufficient_Weight",
+    "Normal_Weight",
+    "Overweight_Level_I",
+    "Overweight_Level_II",
+    "Obesity_Type_I",
+    "Obesity_Type_II",
+    "Obesity_Type_III"
+  ),
+  ordered = TRUE
+)
+
+char_cols_ob <- names(obesity)[sapply(obesity, is.character)]
+char_cols_ob <- setdiff(char_cols_ob, "NObeyesdad")
+obesity[char_cols_ob] <- lapply(obesity[char_cols_ob], factor)
+
+num_cols_ob <- names(obesity)[sapply(obesity, is.numeric)]
+num_cols_ob <- setdiff(num_cols_ob, "NObeyesdad")
+obesity[num_cols_ob] <- scale(obesity[num_cols_ob])
+
+str(obesity)
+summary(obesity$NObeyesdad)
+```
+
+### Model pełny
+
+```{r}
+obesity_fit <- clm(NObeyesdad ~ ., data = obesity)
+summary(obesity_fit)
+```
+
+### Model zredukowany
+
+Usuwamy predyktory o wysokich wartości `p` w modelu pełnym. W razie potrzeby zakres redukcji
+można dostosować po obejrzeniu wyników.
+
+```{r}
+coef_obesity <- coef(summary(obesity_fit))
+coef_obesity
+```
+
+```{r}
+obesity_reduced_fit <- clm(
+  NObeyesdad ~ . - CALC - SCC,
+  data = obesity
+)
+summary(obesity_reduced_fit)
+AIC(obesity_fit, obesity_reduced_fit)
+```
+
+### Porównanie modeli
+
+```{r}
+data.frame(
+  model = c("obesity_full", "obesity_reduced"),
+  logLik = c(logLik(obesity_fit), logLik(obesity_reduced_fit)),
+  AIC = c(AIC(obesity_fit), AIC(obesity_reduced_fit))
+)
+```
+
+### Interpretacja wyników
+
+```{r, results='asis'}
+cat("Wnioski dla zbioru Obesity Levels:\n\n")
+cat("1. Regresja porządkowa jest tu naturalnym wyborem, ponieważ poziom otyłości ma porządek od niedowagi do otyłości typu III.\n")
+cat("2. Po przeskalowaniu zmiennych numerycznych model jest zwykle lepiej uwarunkowany numerycznie.\n")
+cat("3. Istotne predyktory wskazują, które cechy stylu życia i cechy fizyczne zwiększają prawdopodobieństwo przejścia do wyższej kategorii otyłości.\n")
+cat("4. Dodatni współczynnik oznacza wzrost szansy przynależności do wyższej kategorii odpowiedzi, a ujemny współczynnik oznacza efekt odwrotny.\n")
+cat("5. Porównanie AIC dla modelu pełnego i zredukowanego pozwala ocenić, czy uproszczenie modelu nie pogarsza istotnie dopasowania.\n")
+```
+
+## Podsumowanie
+
+```{r, results='asis'}
+cat("Podsumowanie całej analizy:\n\n")
+cat("- W danych Wine Quality modele dla białego i czerwonego wina nie muszą być identyczne. Różnice w istotności i znakach współczynników sugerują, że oba typy wina powinny być analizowane osobno.\n")
+cat("- W danych Obesity Levels regresja porządkowa pozwala badać wpływ cech żywieniowych, aktywności fizycznej oraz cech demograficznych na poziom otyłości.\n")
+cat("- W obu zadaniach skalowanie zmiennych numerycznych poprawia stabilność obliczeń i ułatwia interpretację.\n")
+cat("- Ostateczny wybór modelu warto oprzeć na istotności predyktorów, wartości AIC oraz jakości interpretacji.\n")
+```

@@ -1,0 +1,197 @@
+---
+title: "Regresja Poissonowska"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Regresja Poissonowska
+
+W tej analizie wykorzystujemy zbiór danych `PhdPubs` z pakietu `vcdExtra`.
+Zmienną objaśnianą jest `articles`, czyli liczba publikacji. Celem jest porównanie
+klasycznego modelu regresji Poissona z modelem Poissonowskim z napompowanymi zerami
+(Zero-Inflated Poisson, ZIP).
+
+## Wczytanie pakietów i danych
+
+```{r}
+library(vcdExtra) |> suppressPackageStartupMessages()
+library(pscl) |> suppressPackageStartupMessages()
+
+data("PhdPubs")
+head(PhdPubs)
+str(PhdPubs)
+summary(PhdPubs)
+```
+
+## Przygotowanie danych
+
+```{r}
+dt <- PhdPubs
+head(dt)
+```
+
+Badamy wpływ predyktorów na liczbę publikacji (`articles`).
+
+## Wstępna eksploracja danych
+
+### Liczba zer w zmiennej odpowiedzi
+
+```{r}
+table(dt$articles == 0)
+prop.table(table(dt$articles == 0))
+plot(table(dt$articles), main = "Rozkład zmiennej articles", xlab = "Liczba publikacji", ylab = "Liczność")
+```
+
+### Przykładowe wykresy zależności
+
+```{r}
+plot(articles ~ kid5, data = dt,
+     main = "articles ~ kid5",
+     xlab = "Liczba małych dzieci",
+     ylab = "Liczba publikacji")
+```
+
+```{r}
+plot(log(articles + 0.5) ~ female, data = dt,
+     main = "log(articles + 0.5) ~ female",
+     xlab = "female",
+     ylab = "log(articles + 0.5)")
+```
+
+```{r}
+plot(log(articles + 0.5) ~ married, data = dt,
+     main = "log(articles + 0.5) ~ married",
+     xlab = "married",
+     ylab = "log(articles + 0.5)")
+```
+
+```{r}
+plot(log(articles + 0.5) ~ cut(phdprestige, breaks = unique(quantile(phdprestige, 0:4/4))), data = dt,
+     main = "log(articles + 0.5) ~ phdprestige",
+     xlab = "Przedziały phdprestige",
+     ylab = "log(articles + 0.5)")
+```
+
+```{r}
+plot(log(articles + 0.5) ~ cut(mentor, breaks = unique(quantile(mentor, 0:4/4))), data = dt,
+     main = "log(articles + 0.5) ~ mentor",
+     xlab = "Przedziały mentor",
+     ylab = "log(articles + 0.5)")
+```
+
+### Spinogram
+
+```{r}
+plot(cut(articles, breaks = c(-1, 0, 1, 2, 4, 8, 100)) ~ kid5,
+     data = dt,
+     breaks = 6,
+     main = "Spinogram: articles vs kid5")
+```
+
+## Model regresji Poissona
+
+Budujemy pełny model regresji Poissona.
+
+```{r}
+dt_fit <- glm(articles ~ ., data = dt, family = poisson)
+summary(dt_fit)
+```
+
+## Model z napompowanymi zerami (ZIP)
+
+W zbiorze danych występuje duża liczba obserwacji z `articles == 0`,
+dlatego dopasowujemy także model ZIP.
+
+### Model ZIP pełny
+
+```{r}
+dt_zip0_fit <- zeroinfl(articles ~ ., data = dt)
+summary(dt_zip0_fit)
+```
+
+### Model ZIP zredukowany
+
+W wersji zredukowanej modelujemy liczbę publikacji wszystkimi głównymi zmiennymi,
+a część odpowiedzialną za nadmiar zer opisujemy przez `kid5`, `phdprestige` i `mentor`.
+
+```{r}
+dt_zip_fit <- zeroinfl(
+  articles ~ female + married + kid5 + phdprestige + mentor |
+    kid5 + phdprestige + mentor,
+  data = dt
+)
+summary(dt_zip_fit)
+```
+
+## Porównanie modeli
+
+Porównujemy modele na podstawie logLik oraz AIC.
+
+```{r}
+data.frame(
+  model = c("Poisson", "ZIP full", "ZIP reduced"),
+  logLik = vapply(
+    list(dt_fit, dt_zip0_fit, dt_zip_fit),
+    function(x) as.numeric(logLik(x)),
+    FUN.VALUE = double(1)
+  ),
+  AIC = vapply(
+    list(dt_fit, dt_zip0_fit, dt_zip_fit),
+    AIC,
+    FUN.VALUE = double(1)
+  )
+)
+```
+
+## Predykcje i porównanie dopasowania
+
+```{r}
+dt$fit_pois <- fitted(dt_fit)
+dt$fit_zip  <- fitted(dt_zip_fit)
+
+head(dt[, c("articles", "fit_pois", "fit_zip")])
+```
+
+```{r}
+plot(dt$articles, dt$fit_pois,
+     xlab = "Wartości obserwowane",
+     ylab = "Predykcja Poisson",
+     main = "Poisson: obserwacje vs predykcje")
+abline(0, 1, col = 2, lwd = 2)
+```
+
+```{r}
+plot(dt$articles, dt$fit_zip,
+     xlab = "Wartości obserwowane",
+     ylab = "Predykcja ZIP",
+     main = "ZIP: obserwacje vs predykcje")
+abline(0, 1, col = 2, lwd = 2)
+```
+
+## Wnioski
+
+```{r, echo=FALSE, results='asis'}
+cat("1. Zmienna articles ma charakter zliczeniowy i zawiera znaczącą liczbę zer.\n")
+cat("2. Model Poissona stanowi naturalny punkt wyjścia do modelowania takich danych.\n")
+cat("3. Ze względu na nadmiar zer warto rozważyć model ZIP, który osobno modeluje prawdopodobieństwo zera oraz liczbę publikacji.\n")
+cat("4. Ostateczną ocenę jakości dopasowania wykonujemy na podstawie AIC i logLik.\n")
+cat("5. Model z mniejszym AIC uznajemy za lepiej dopasowany do danych.\n")
+```
+
+## Komentarz do sprawozdania
+
+```{r eval=FALSE}
+# W analizie wykorzystano zbiór danych PhdPubs z pakietu vcdExtra.
+# Zmienną objaśnianą była liczba publikacji articles.
+# Najpierw dopasowano klasyczny model regresji Poissona.
+# Następnie sprawdzono rozkład zmiennej odpowiedzi i zaobserwowano znaczną liczbę zer.
+# Z tego powodu dopasowano również model Zero-Inflated Poisson (ZIP).
+# Porównanie modeli wykonano przy użyciu logLik oraz AIC.
+# Jeżeli model ZIP osiąga niższe AIC niż model Poissona,
+# oznacza to lepsze dopasowanie do danych z nadmiarem zer.
+```
+
+
