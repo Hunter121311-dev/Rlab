@@ -1,0 +1,70 @@
+---
+title: "Raport z wykresami 3"
+author: "wpisz swoję imię"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+######NIE MODYFIKUJ
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+
+Postępując zgodnie z instrukcjami na stronie zadania, utworzysz cztery oryginalne wizualizacje.
+
+## Wizualizacja 1
+
+
+To jest po prostu wykres punktów **(x, y)**, które są generowane przez rozkład normalny. Użyłem tutaj **theme_classic** oraz `rnorm` do wygenerowania punktów z rozkładu normalnego.
+
+**Umieść tutaj swój wykres:**
+
+
+```{r wykres1,echo=TRUE}
+
+####NAPISZ KOD TUTAJ
+
+
+```
+
+## Wizualizacja 2
+
+
+Ten wykres porównuje 100 liczb z dwóch generatorów liczb losowych, **runif** i **rnorm**. Oba zostały wykonane z domyślnymi argumentami.
+
+**Umieść tutaj swój wykres:**
+
+```{r wykres2,echo=TRUE}
+
+####NAPISZ KOD TUTAJ
+
+
+```
+
+## Wizualizacja 3
+
+Ten wykres pokazuje 200 losowych liczb wygenerowanych przez **rnorm** z domyślnymi ustawieniami, a ich zmiany są widoczne na **osi y**.
+
+**Umieść tutaj swój wykres:**
+
+```{r wykres3,echo=TRUE}
+
+####NAPISZ KOD TUTAJ
+
+
+```
+
+## Wizualizacja 4
+
+Ten kod również dotyczy losowych wartości. Tworzę losowe wartości x i dla każdej z nich losowy typ grupy. Przedstawiam to jako wykres słupkowy. Na końcu dodałem motyw New York Times **theme_wsj()**.
+
+**Umieść tutaj swój wykres:**
+
+```{r wykres4,echo=TRUE}
+#install.packages("ggthemes")
+library(ggthemes)
+####NAPISZ KOD TUTAJ
+
+```

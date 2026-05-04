@@ -1,0 +1,120 @@
+---
+title: "Raport z zaawansowanymi wizualizacjami"
+subtitle: "Mapy"
+author: "twoje imię i nazwisko"
+output: html_document
+---
+
+## Mapa 1
+
+Utwórz następujący wykres, używając danych zawartych w pliku R Markdown.
+
+```{r problem_1_data,include=FALSE}
+# NIEZBEDNE BILBIOTEKI
+library(tidyverse)
+library(maps)
+### DANE
+my_world_map <- map_data("world")
+countries <- unique(my_world_map$region)
+set.seed(987)
+some_data_values <- data.frame(
+  "region"=countries,
+  "Score"=runif(252,0,100))
+```
+
+```{r problem_1,echo=TRUE,message=FALSE}
+# WSKAZÓWKA: upewnij się, że używasz left_join, aby połączyć powyższe data_values z danymi mapy świata w my_world_map.
+# UMIEŚĆ TUTAJ SWÓJ KOD.
+
+world_score <- left_join(my_world_map, some_data_values, by = "region")
+
+ggplot(
+  data = world_score,
+  aes(x = long, y = lat, group = group, fill = Score)
+) +
+  geom_polygon() +
+  scale_fill_gradient(
+    low = "palegreen",
+    high = "darkgreen"
+  ) +
+  labs(
+    x = "long",
+    y = "lat",
+    fill = "Score"
+  )
+```
+
+## Mapa 2
+
+Utwórz następujący wykres, używając danych zawartych w pliku R Markdown.
+
+
+```{r problem_2_data,include=FALSE}
+##### NIE MODYFIKUJ TEGO KAWALKA ->
+set.seed(15)
+Measurement<-rnorm(32,50,1)
+# <-
+```
+
+
+```{r solution_p2,echo=TRUE,message=FALSE}
+# WSKAZÓWKA: Użyj polecenia filter, aby uzyskać tylko mapy Kostaryki, Panamy i Nikaragui.
+# WSKAZÓWKA: Użyj polecenia filter, aby umieścić punkty tylko dla miast o populacji powyżej 40 000. Powinno to pozostawić 32 miasta.
+# WSKAZÓWKA: Użyj add_column, aby dołączyć zmienną "Measurement" do swoich danych i ustaw ją jako estetykę koloru podczas rysowania punktów.
+# WSKAZÓWKA: Ustaw kolory dla punktów miast za pomocą scale_color_distiller(palette=7).
+# WSKAZÓWKA: Ustaw rozmiar wszystkich punktów na wartość 5.
+# UMIEŚĆ TUTAJ SWÓJ KOD.
+
+library(maps)
+
+mapa <- map_data("world") %>%
+  filter(region %in% c("Costa Rica", "Panama", "Nicaragua"))
+wc <- maps::world.cities
+wc <- wc %>%
+  filter(pop > 40000, country.etc %in% c("Panama", "Nicaragua", "Costa Rica"))
+  print
+ggplot() +
+  geom_polygon(
+    data = mapa,
+    aes(x = long, y = lat, group = group),
+    fill = "white",
+    color = "black"
+  ) +
+  geom_point(
+    data = wc,
+    aes(x = long, y = lat, color = Measurement),
+    size = 5
+  ) +
+  scale_color_distiller(palette = 7) +
+  labs(
+    x = "long",
+    y = "lat",
+    color = "Measurement"
+  )
+```
+
+## Mapa 3
+
+Utwórz następujący wykres, używając danych zawartych w pliku R Markdown.
+
+Zauważ, że kod w pliku .rmd zaimportuje zestaw danych prostych obiektów dla Ameryki Południowej. Upewnij się, że zainstalowałeś wszystkie niezbędne pakiety. 
+
+```{r problem_3_data,include=FALSE}
+##### WYMAGANE BIBLIOTEKI
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+#library(rgeos)
+#### NIE MODYFIKUJ PONIZSZEGO
+s_america<-ne_countries(scale="medium",continent='south america',returnclass="sf")
+```
+
+```{r problem3,echo=TRUE}
+# WSKAZÓWKA: Obiekt s_america utworzony w powyższym bloku jest obiektem prostych cech z wieloma kolumnami. Zidentyfikuj poprawną kolumnę na podstawie wykresu rozwiązania i użyj jej do pokolorowania choropleth.
+# WSKAZÓWKA: Użyj scale_fill_distiller i palety 10, aby dopasować kolory.
+## UMIEŚĆ TUTAJ SWÓJ KOD.
+
+
+```
+
+

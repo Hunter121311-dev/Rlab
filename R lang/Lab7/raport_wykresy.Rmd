@@ -1,0 +1,70 @@
+---
+title: "Raport z wykresami 1"
+author: "wpisz swoje imię"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# PONIZSZEGO NIE MODYFIKUJ
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+## POPRAW SCIEZKE DO PLIKU
+cel <- drop_na(read_csv("cel_volden_wiseman.csv"))
+```
+
+Twoim celem jest odtworzenie tych wykresów, stworzonych przy użyciu danych Center of Legislative Effectiveness.
+
+**WAŻNE: Przefiltruj dane, aby wyświetlić informacje tylko dla 115. Kongresu.**
+
+## Wykres 1
+
+**Wskazówki:**
+
+* Dla osi y użyj zmiennej "all_pass".
+* Dla osi x użyj zmiennej "dwnom1".
+* Upewnij się, że przekodujesz dane dla zmiennej "female" i zmienisz jej nazwę na "Gender", aby wygenerować poprawne etykiety dla legendy.
+* Ustaw estetykę koloru w funkcji ggplot(), aby kolor kropek zmieniał się w zależności od płci (Gender).
+* Upewnij się, że etykiety osi są poprawne.
+
+
+```{r wykres1,echo=TRUE}
+# KOD
+
+
+```
+
+## Wykres 2
+
+**Wskazówki:**
+
+* Dla osi x użyj zmiennej "votepct".
+* Dla osi y użyj zmiennej "all_pass".
+* Upewnij się, że przekodujesz dane dla zmiennej "female", aby wygenerować poprawne etykiety dla legendy. Zmień nazwę tej kolumny na "Gender". (mogłeś to już zrobić w poprzednim zadaniu)
+* Upewnij się, że przekodujesz dane dla zmiennej "majority", aby wygenerować poprawne etykiety dla wykresów podzielonych na panele (ang. *facetted figures*).
+* Ustaw estetykę koloru w funkcji ggplot(), aby kolor kropek zmieniał się w zależności od płci (Gender).
+* Użyj `scale_color_manual()`, aby ustawić kolory na zielony dla mężczyzn i pomarańczowy dla kobiet.
+* Upewnij się, że etykiety osi są poprawne.
+
+
+
+```{r wykres2,echo=TRUE}
+# KOD
+
+
+```
+
+## Wykres 3
+
+**Wskazówki:**
+
+* Dla osi y użyj zmiennej "les".
+* Upewnij się, że przekodujesz dane dla zmiennej "majority", aby wygenerować poprawne etykiety. (mogłeś to już zrobić w poprzednim zadaniu)
+* Upewnij się, że etykiety osi i tytuł wykresu są poprawne.
+
+
+
+```{r wykres3,echo=TRUE}
+# KOD
+
+
+```

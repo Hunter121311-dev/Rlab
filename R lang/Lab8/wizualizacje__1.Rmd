@@ -1,0 +1,305 @@
+---
+title: "Raport z zaawansowanymi wizualizacjami"
+subtitle: "Wykresy statyczne"
+author: "Damian Staroń"
+output: html_document
+---
+
+
+## Wykres 1
+
+Utwórz wykres z rozwiązania zadania 1, używając danych zawartych w pliku R Markdown.
+
+```{r problem_1_data,include=FALSE}
+
+#####NIE MODYFIKUJ DANYCH ->
+library(tidyverse)
+
+set.seed(12345)
+var1<-runif(50,0,10)
+set.seed(12345)
+var2<-var1+rnorm(50,5,2)
+set.seed(12345)
+var3<- var1*(-rnorm(50,1,.2))
+
+dat1<-tibble(var1,var2,var3)
+## <-
+
+```
+
+```{r problem_1,echo=TRUE,message=FALSE}
+ggplot(data = dat1, aes(x = var1, y = var2)) +
+  geom_point(color = "black") +
+  geom_smooth(method = "loess", se = TRUE, color = "blue", fill = "grey70") +
+  labs(
+    x = "Variable 1",
+    y = "Variable 2"
+  )
+
+```
+
+## Wykres 2
+
+Utwórz wykres z rozwiązania zadania 2, używając danych zawartych w pliku R Markdown do tego zadania.
+
+```{r problem_2_data,include=FALSE}
+#####NIE MODYFIKUJ DANYCH ->
+set.seed(10)
+var1<-runif(50,0,10)
+set.seed(10)
+var2<-var1+rnorm(50,5,2)
+set.seed(10)
+var3<- var1*(-rnorm(50,1,.2))
+dat2<-tibble(var1,var2,var3)
+## <-
+```
+
+
+```{r solution_p2,echo=TRUE,message=FALSE}
+#### TWOJ KOD TUTAJ
+library(GGally)
+# WSKAZÓWKA: użyj ggpairs
+# WSKAZÓWKA: poniższy kod może się przydać w ggpairs
+
+my_density <- function(data, mapping, ...){
+  ggplot(data = data, mapping = mapping) + 
+    geom_density(fill = "blue", ...)
+}
+
+my_scatter <- function(data, mapping, ...){
+  ggplot(data = data, mapping = mapping) + 
+    geom_point(color = "orange", ...)
+}
+
+ggpairs(
+  data = dat2,
+  columns = c("var1", "var2", "var3"),
+  diag = list(continuous = my_density),
+  lower = list(continuous = my_scatter),
+  upper = list(continuous = "cor")
+)
+
+```
+
+## Wykres 3
+
+Utwórz wykres zadania 3, używając danych w R Markdown.
+
+
+```{r problem_3_data,include=FALSE}
+#####NIE MODYFIKUJ DANYCH ->
+set.seed(12)
+var1<-runif(50,0,10)
+set.seed(12)
+var2<-var1+rnorm(50,5,2)
+set.seed(12)
+var3<- var1*(-rnorm(50,1,.2))
+dat3<-tibble(var1,var2,var3)
+## <-
+```
+
+```{r problem3,echo=TRUE}
+#### TWOJ KOD TUTAJ
+# WSKAZÓWKA: są wbudowane funkcje do korelacji 
+# WSKAZÓWKA: jest wbudowana funkcja z ggplot2 do robienia tego wykresów korelacji
+# obliczenie korelacji
+library(ggcorrplot)
+corr <- cor(dat3)
+
+ggcorrplot(
+  corr,
+  type = "lower",
+  show.diag = FALSE,
+  colors = c("blue", "white", "red"),
+  legend.title = "Corr",
+  title = "Correlations"
+) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+## Wykres 4
+
+Utwórz wykres zadania 4, używając danych w R Markdown.
+
+```{r problem_4_data,include=FALSE}
+#####NIE MODYFIKUJ DANYCH ->
+set.seed(5678)
+var1<-rnorm(10,25,5)
+names<-letters[1:10]
+dat4<-tibble(names,var1)
+## <-
+```
+
+```{r problem_4,echo=TRUE}
+#### TWOJ KOD TUTAJ
+# WSKAZÓWKA: powinneś zmodyfikować theme
+library(ggplot2)
+
+ggplot(dat4, aes(x = var1, y = factor(names, levels = letters[1:10]))) +
+  geom_hline(
+    yintercept = 1:10,
+    color = "orange",
+    linetype = "dashed"
+  ) +
+  geom_point(
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "Variable 1",
+    y = NULL
+  ) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+```
+
+## Wykres 5
+
+Utwórz wykres zadania 5, używając danych w R Markdown.
+
+```{r problem_5_data,include=FALSE}
+##### NIE MODYFIKUJ DANYCH ->
+set.seed(13)
+var1<-rnorm(10,25,5)
+names<-letters[1:10]
+dat5<-tibble(names,var1)
+## <-
+```
+
+```{r problem_5,echo=TRUE}
+#### TWOJ KOD TUTAJ
+library(ggplot2)
+
+ggplot(dat5, aes(x = reorder(names, var1), y = var1)) +
+  geom_segment(
+    aes(
+      x = reorder(names, var1),
+      xend = reorder(names, var1),
+      y = 0,
+      yend = var1
+    ),
+    color = "darkgreen",
+    linewidth = 1
+  ) +
+  geom_point(
+    color = "darkgreen",
+    size = 3
+  ) +
+  labs(
+    x = "Variable 1",
+    y = NULL
+  )
+```
+
+## Wykres 6
+
+Utwórz wykres, używając danych w R Markdown.
+
+```{r problem_6_data,include=FALSE}
+##### NIE MODYFIKUJ DANYCH ->
+set.seed(8)
+fiction<-tibble(Genre=rep("Fiction",5),Time=seq(1:5),Total=sample(1:10,5))
+set.seed(7)
+biography<-tibble(Genre=rep("Biography",5),Time=seq(1:5),Total=sample(1:10,5))
+set.seed(9)
+mystery<-tibble(Genre=rep("Mystery",5),Time=seq(1:5),Total=sample(1:10,5))
+books_checked_out<-bind_rows(fiction,biography,mystery)
+## <-
+```
+
+```{r problem_6,echo=TRUE}
+#### TWOJ KOD TUTAJ
+library(ggplot2)
+
+ggplot(
+  books_checked_out,
+  aes(
+    x = Time,
+    y = Total,
+    fill = factor(Genre, levels = c("Mystery", "Fiction", "Biography"))
+  )
+) +
+  geom_area() +
+  scale_fill_manual(
+    values = c(
+      "Mystery" = "cornflowerblue",
+      "Fiction" = "green3",
+      "Biography" = "salmon"
+    ),
+    breaks = c("Biography", "Fiction", "Mystery"),
+    name = "Genre"
+  ) +
+  labs(
+    title = "Books Checked Out",
+    x = "Time",
+    y = "Total"
+  )
+```
+
+## Wykres 7
+
+Utwórz wykres, używając danych w R Markdown.
+
+```{r problem_7_data,include=FALSE}
+##### NIE MODYFIKUJ DANYCH ->
+books_checked_out2 <- books_checked_out %>%
+  filter(Time==1 | Time==5) %>%
+  pivot_wider(names_from = Time,values_from=Total) %>%
+  rename(Time1=`1`,Time5=`5`)
+## <-
+```
+   
+```{r,problem_7,echo=TRUE,warning=FALSE,message=FALSE}   
+#### TWOJ KOD TUTAJ
+library(ggalt)
+ggplot(
+  books_checked_out2,
+  aes(
+    y = factor(Genre, levels = c("Biography", "Fiction", "Mystery")),
+    x = Time1,
+    xend = Time5
+  )
+) +
+  geom_dumbbell(
+    color = "gray40",
+    size = 0.8,
+    colour_x = "red",
+    colour_xend = "purple",
+    size_x = 3,
+    size_xend = 3
+  ) +
+  labs(
+    x = "Time1",
+    y = "Genre"
+  )
+```
+
+## Wykres 8
+
+Utwórz wykres używając danych w R Markdown.
+
+```{r, problem_8_data,include=FALSE}
+##### NIE MODYFIKUJ DANYCH ->
+pie_dat<-c(1,2,3,4,5)
+## <-
+```
+
+```{r, problem_8,echo=TRUE}
+###WSKAZÓWKA: sprawdź plik Pomocy dla funkcji pie, aby dowiedzieć się, jak określić kolor dla palety my_color.
+library(RColorBrewer)
+#### TWOJ KOD TUTAJ
+
+my_color <- brewer.pal(n = 5, name = "Spectral")
+
+pie(
+  pie_dat,
+  labels = pie_dat,
+  col = my_color
+)
+```
+
+

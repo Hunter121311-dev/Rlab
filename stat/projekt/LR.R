@@ -56,7 +56,7 @@ test$pred_wind  <- predict(model_wind, newdata = test)
 test$pred_windg <- predict(model_wind_g, newdata = test)
 
 # wybór dokładnie 2 dni
-start_day <- as.Date("2025-06-05")
+start_day <- as.Date("2025-06-02")
 end_day <- start_day + 1
 
 wykres <- test[as.Date(test$datetime) >= start_day & as.Date(test$datetime) <= end_day, ]

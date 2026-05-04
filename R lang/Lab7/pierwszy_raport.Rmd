@@ -1,0 +1,200 @@
+---
+title: "Pierwszy raport"
+author: "Twoje imię"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+##### NIE MODYFIKUJ
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+##### SKOPIUJ PLIK Z UPELA I WRZUC DO ODPOWIEDNIEGO KATALOGU
+dat <- drop_na(read.csv("cces_sample.csv"))
+```
+
+# Problem 1 
+
+**Utwórz wektor i oblicz sumę:**
+
+* Utwórz wektor zawierający pięć wybranych przez Ciebie liczb z zakresu od 0 do 10.
+* Zapisz ten wektor do obiektu.
+* Użyj funkcji `sum()` do obliczenia sumy liczb w wektorze.
+
+
+```{r,problem1}
+liczby <- c(2, 4, 6, 8, 10)
+suma_liczb <- sum(liczby)
+suma_liczb
+```
+
+# Problem 2
+
+
+**Utwórz ramkę danych:**
+
+* Utwórz ramkę danych zawierającą dwie kolumny.
+* Pierwsza kolumna musi zawierać liczby od 1 do 5, a druga kolumna liczby od 6 do 10.
+* Pierwsza kolumna musi mieć nazwę "alpha", a druga kolumna musi mieć nazwę "beta".
+* Nazwij obiekt "my_dat".
+* Wyświetl dane.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+```{r,problem2}
+# KOD
+```
+
+# Problem 3 
+
+
+**Użycie funkcji `summary()`:**
+
+* Używając ramki danych utworzonej w Zadaniu 2, użyj polecenia `summary()` aby stworzyć podsumowanie pięciu liczb dla kolumny o nazwie "beta".
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r,problem3}
+# KOD
+```
+
+# Problem 4
+
+**Wykres pudełkowy dochodu rodzinnego:**
+
+* W bloku konfiguracji raportu (wiersz 13) znajduje się kod do importowania przykładowych danych ankietowych, który uruchomi się automatycznie.
+* Używając tych danych, utwórz wykres pudełkowy kolumny "Family Income" za pomocą funkcji Base R (nie rysunek utworzony za pomocą `qplot`).
+* Umieść swoje imię w tytule wykresu.
+* Zmień etykietę osi x na "Family Income".
+
+**Wskazówka:** Sprawdź książkę kodową, aby zidentyfikować poprawną nazwę kolumny dla pytania o dochód rodziny.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r,problem4}
+# KOD
+
+```
+
+# Problem 5
+
+**Filtrowanie danych ankietowych:**
+
+* Używając danych ankietowych, przefiltruj je, aby otrzymać podzbiór zawierający tylko mężczyzn, którzy mieszkają na północnym zachodzie lub środkowym zachodzie Stanów Zjednoczonych, są małżeństwem i identyfikują się jako osoby zainteresowane wiadomościami przez większość czasu.
+* Użyj funkcji `str()` aby dostarczyć informacje o uzyskanym zbiorze danych.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+ 
+```{r problem5,include=TRUE,echo=TRUE}
+# KOD
+
+```
+
+# Problem 6
+
+**Filtrowanie danych i tabela częstotliwości:**
+
+* Przefiltruj dane tak samo jak w problemie 5.
+* Użyj funkcji R, aby utworzyć tabelę częstotliwości odpowiedzi na pytanie, czy respondenci ankiety inwestują na giełdzie.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r problem6,include=TRUE,echo=TRUE}
+# KOD
+
+  
+``` 
+
+# Problem 7
+
+**Tworzenie nowej kolumny "tax_scale":**
+
+* Wracając do użycia wszystkich wierszy w zbiorze danych, utwórz nową kolumnę w danych za pomocą `mutate`, która będzie równa 0, 1 lub 2, aby odzwierciedlić, czy respondent popiera podniesienie standardowej ulgi podatkowej z 12 000 do 25 000, popiera obniżenie stawki podatku dochodowego od osób prawnych z 39 do 21 procent, czy oba te działania (czyli poparcie dla żadnej z polityk równe 0, poparcie dla jednej z dwóch polityk równe 1, a poparcie dla obu polityk równe 2).
+* Nazwij kolumnę "tax_scale".
+* **Wskazówka:** Będziesz musiał użyć także funkcji `recode()`.
+
+* Wyświetl pierwsze dwadzieścia elementów nowo utworzonej kolumny.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r problem7,include=TRUE,echo=TRUE}
+# KOD
+
+```
+
+# Problem 8
+
+**Tabela częstotliwości dla "tax_scale":**
+
+* Użyj polecenia tabeli częstotliwości, aby pokazać, ile jest 0, 1 i 2 w kolumnie utworzonej w Zadaniu 7.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r problem8,include=TRUE,echo=TRUE}
+# KOD
+
+```
+
+# Problem 9
+
+**Obliczanie średniej aprobaty dla Prezydenta Trumpa według regionów:**
+
+* Ponownie, używając wszystkich wierszy oryginalnego zbioru danych, użyj `summarise` i `group_by`, aby obliczyć średnią (średnią arytmetyczną) aprobatę dla pracy Prezydenta Trumpa w każdym z czterech regionów wymienionych w kolumnie "region".
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+ 
+```{r problem9}
+# KOD
+
+```
+ 
+# Problem 10
+
+**Tabela podsumowująca dla nie-inwestorów z określonym dochodem:**
+
+* Ponownie, zacznij od wszystkich wierszy oryginalnego zbioru danych, użyj `summarise()`, aby utworzyć tabelę podsumowującą dla respondentów ankiety, którzy nie są inwestorami i których roczny dochód rodzinny wynosi od 40 000 do 119 999 dolarów rocznie.
+* Tabela powinna zawierać średnią, medianę i odchylenie standardowe dla kolumny dotyczącej ważności religii.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r problem10}
+# KOD
+
+```
+
+# Problem 11
+
+**Tabela z kable() i summarise():**
+
+* Użyj `kable()` i funkcji `summarise()`, aby utworzyć tabelę z jednym wierszem i trzema kolumnami, która zawiera średnią, medianę i odchylenie standardowe dla kolumny o nazwie `faminc_new` w danych ankietowych.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+```{r problem11}
+# KOD
+
+```
+
+# Problem 12
+
+**Histogram identyfikacji partyjnej (pid7):**
+
+* Używając danych ankietowych, użyj `qplot()` do utworzenia histogramu kolumny o nazwie `pid7`.
+* Zmień etykietę osi x na "Siedmiopunktowa Identyfikacja Partyjna", a etykietę osi y na "Liczba".
+
+**Uwaga:** Możesz zignorować komunikat "stat_bin()", który generuje R podczas rysowania tego wykresu. Konfiguracja bloku kodu spowoduje pominięcie tego komunikatu.
+
+**Umieść tutaj swój kod i rozwiązanie:**
+
+
+```{r problem12,message=FALSE}
+# KOD
+
+```

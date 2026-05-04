@@ -1,0 +1,68 @@
+---
+title: "Raport z wykresami 2"
+author: "wpisz swoje imię"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+###### NIE MODYFIKUJ
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#### POPRA SCIEZKE DO PLIKU JESLI TRZEBA
+cces <- drop_na(read_csv("cces_sample.csv"))
+```
+
+Twoim celem jest odtworzenie tych wykresów, stworzonych przy użyciu danych Cooperative Congressional Election Study.
+
+## Wykres 1
+
+**Wskazówki:**
+
+* Dla osi x użyj zmiennej "ideo5".
+* Upewnij się, że przekodujesz dane dla zmiennej "ideo5", aby wygenerować poprawne nazwy dla osi x. Będziesz musiał zajrzeć do książki kodowej.
+* Użyj estetyki `fill`, aby R wypełnił słupki. Nie musisz ustawiać kolorów ręcznie.
+* Użyj `guides()` do usunięcia legendy.
+* Upewnij się, że etykiety osi i tytuł wykresu są poprawne.
+
+
+
+```{r wykres1,warning = FALSE,echo=TRUE}
+####KOD
+
+```
+
+## Wykres 2
+
+**Wskazówki:**
+
+* Dla osi x użyj zmiennej "pew_religimp".
+* Upewnij się, że przekodujesz dane dla zmiennej "pew_religimp", aby wygenerować poprawne etykiety dla osi x. Będziesz musiał zajrzeć do książki kodowej.
+* Zmień nazwę kolumny dla Ideologii, aby pierwsza litera była wielka (aby legenda wyświetlała się poprawnie).
+* Użyj estetyki `fill`, aby R wypełnił słupki. Nie musisz ustawiać kolorów ręcznie.
+* Upewnij się, że etykiety osi i tytuł wykresu są poprawne.
+
+
+```{r wykres2,echo=TRUE}
+####KOD
+
+```
+
+## Wykres 3
+
+**Instrukcje:**
+
+* W tej wizualizacji tworzysz własne dane do ćwiczeń.
+* Utwórz tibble/ramkę danych z trzema kolumnami: Semestr, Student i Ocena.
+* Powinno być sześć semestrów i trzech studentów (Amanda, Betty i Carol).
+* Utwórz oceny dla studentów, używając polecenia `runif()`, z wartościami od 80 do 100. 
+
+**Wskazówka:** Będziesz potrzebować łącznie 18 ocen.
+* Wykres powinien wyglądać mniej więcej tak (Twoje wartości będą się nieznacznie różnić):
+
+
+
+```{r wykres3,echo=TRUE}
+####KOD
+
+```
