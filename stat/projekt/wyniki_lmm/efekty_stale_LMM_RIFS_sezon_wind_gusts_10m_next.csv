@@ -1,0 +1,21 @@
+"target","model","parametr","estimate"
+"wind_gusts_10m_next","LMM RIFS sezon","(Intercept)",32.0124691447449
+"wind_gusts_10m_next","LMM RIFS sezon","wind_speed_10m_z",5.08465314621894
+"wind_gusts_10m_next","LMM RIFS sezon","wind_speed_100m_z",1.14118558665757
+"wind_gusts_10m_next","LMM RIFS sezon","wind_gusts_10m_z",8.04598677147669
+"wind_gusts_10m_next","LMM RIFS sezon","wind_dir_sin_z",-0.000774527383136347
+"wind_gusts_10m_next","LMM RIFS sezon","wind_dir_cos_z",-0.068276661190531
+"wind_gusts_10m_next","LMM RIFS sezon","temperature_2m_z",0.0166226352218015
+"wind_gusts_10m_next","LMM RIFS sezon","relative_humidity_2m_z",0.452529525156075
+"wind_gusts_10m_next","LMM RIFS sezon","dew_point_2m_z",-1.6096368560778
+"wind_gusts_10m_next","LMM RIFS sezon","apparent_temperature_z",1.60051462850483
+"wind_gusts_10m_next","LMM RIFS sezon","precipitation_z",0.209575167990882
+"wind_gusts_10m_next","LMM RIFS sezon","cloud_cover_z",0.235406811836928
+"wind_gusts_10m_next","LMM RIFS sezon","pressure_msl_z",-0.0979854598549401
+"wind_gusts_10m_next","LMM RIFS sezon","shortwave_radiation_z",0.888253837893568
+"wind_gusts_10m_next","LMM RIFS sezon","is_day_z",-0.078710934889539
+"wind_gusts_10m_next","LMM RIFS sezon","sin_dzien_z",-0.0696093653656358
+"wind_gusts_10m_next","LMM RIFS sezon","cos_dzien_z",-0.0733290811244956
+"wind_gusts_10m_next","LMM RIFS sezon","sin_godzina_z",0.552268599770044
+"wind_gusts_10m_next","LMM RIFS sezon","cos_godzina_z",-0.302022763737716
+"wind_gusts_10m_next","LMM RIFS sezon","polrocze_cieple_z",-0.0328160778683832

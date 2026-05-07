@@ -1,0 +1,31 @@
+formula: 
+warunki_poziom_next ~ wind_speed_10m + wind_speed_100m + wind_gusts_10m + wind_dir_sin + wind_dir_cos + pressure_msl + precipitation + cloud_cover + shortwave_radiation + is_day + sin_dzien + cos_dzien + sin_godzina + cos_godzina
+data:    dane_grupa
+
+ link  threshold nobs   logLik    AIC       niter max.grad cond.H 
+ logit flexible  115007 -58674.69 117383.38 7(0)  5.27e-11 3.2e+02
+
+Coefficients:
+                     Estimate Std. Error z value Pr(>|z|)    
+wind_speed_10m       1.492518   0.059511  25.080  < 2e-16 ***
+wind_speed_100m      0.612259   0.050427  12.141  < 2e-16 ***
+wind_gusts_10m      -2.096503   0.042911 -48.857  < 2e-16 ***
+wind_dir_sin         0.112224   0.009754  11.506  < 2e-16 ***
+wind_dir_cos        -0.043363   0.009283  -4.671 3.00e-06 ***
+pressure_msl         0.030382   0.007881   3.855 0.000116 ***
+precipitation       -0.128960   0.013007  -9.914  < 2e-16 ***
+cloud_cover         -0.087917   0.010841  -8.110 5.06e-16 ***
+shortwave_radiation -0.745515   0.026656 -27.968  < 2e-16 ***
+is_day               0.270376   0.017773  15.213  < 2e-16 ***
+sin_dzien            0.250026   0.009289  26.915  < 2e-16 ***
+cos_dzien           -1.682486   0.029531 -56.973  < 2e-16 ***
+sin_godzina          1.006001   0.009906 101.551  < 2e-16 ***
+cos_godzina         -3.501595   0.036657 -95.524  < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Threshold coefficients:
+                   Estimate Std. Error z value
+Zle|Umiarkowane     1.09485    0.02247   48.73
+Umiarkowane|Dobre   1.93263    0.02315   83.47
+Dobre|Bardzo_dobre  5.20159    0.02878  180.72

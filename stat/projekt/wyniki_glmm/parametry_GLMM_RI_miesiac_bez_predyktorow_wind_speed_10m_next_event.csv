@@ -1,0 +1,2 @@
+"target","model","parametr","estimate","std_error","statistic","p_value"
+"wind_speed_10m_next_event","GLMM RI miesiac bez predyktorow","(Intercept)",-1.91607864087017,0.180644990727107,-10.6068739197131,2.76857443602733e-26

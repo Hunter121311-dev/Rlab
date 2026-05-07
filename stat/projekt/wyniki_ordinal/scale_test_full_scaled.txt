@@ -1,0 +1,27 @@
+Tests of scale effects
+
+formula: warunki_poziom_next ~ wind_speed_10m + wind_speed_100m + wind_gusts_10m + wind_dir_sin + wind_dir_cos + temperature_2m + relative_humidity_2m + dew_point_2m + apparent_temperature + precipitation + cloud_cover + pressure_msl + shortwave_radiation + weather_code + is_day + sin_dzien + cos_dzien + sin_godzina + cos_godzina + polrocze
+                     Df  logLik    AIC    LRT  Pr(>Chi)    
+<none>                  -150051 300170                     
+wind_speed_10m        1 -148504 297077 3094.6 < 2.2e-16 ***
+wind_speed_100m       1 -147848 295766 4406.0 < 2.2e-16 ***
+wind_gusts_10m        1 -149223 298515 1656.2 < 2.2e-16 ***
+wind_dir_sin          1 -149720 299510  661.8 < 2.2e-16 ***
+wind_dir_cos          1 -149992 300054  117.5 < 2.2e-16 ***
+temperature_2m        1 -149856 299782  389.2 < 2.2e-16 ***
+relative_humidity_2m  1 -149446 298963 1208.7 < 2.2e-16 ***
+dew_point_2m          1 -150017 300104   67.6 < 2.2e-16 ***
+apparent_temperature  1 -149739 299547  624.2 < 2.2e-16 ***
+precipitation         1 -149870 299810  361.9 < 2.2e-16 ***
+cloud_cover           1 -149838 299745  426.6 < 2.2e-16 ***
+pressure_msl          1 -149451 298972 1199.9 < 2.2e-16 ***
+shortwave_radiation   1 -147906 295881 4290.5 < 2.2e-16 ***
+weather_code         12 -149665 299422  771.3 < 2.2e-16 ***
+is_day                1 -149949 299969  203.1 < 2.2e-16 ***
+sin_dzien             1 -150047 300164    7.6  0.005678 ** 
+cos_dzien             1 -149992 300054  118.1 < 2.2e-16 ***
+sin_godzina           1 -148394 296857 3314.3 < 2.2e-16 ***
+cos_godzina           1 -149990 300050  122.1 < 2.2e-16 ***
+polrocze              1 -149983 300036  135.4 < 2.2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1

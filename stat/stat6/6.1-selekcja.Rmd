@@ -1,0 +1,289 @@
+---
+title: "Selekcja cech dla modeli liniowych"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(ISLR)
+library(leaps)
+```
+
+## Selekcja cech dla modeli liniowych
+
+Używamy zbioru danych `Hitters` z pakietu `ISLR` (`?Hitters`). Należy usunąć
+wiersze zawierające wartości `NA`. 
+
+```{r na.omit}
+Hitters <- na.omit(Hitters)
+```
+
+Metody selekcji cech są zaimplementowane
+w funkcji `regsubsets()` z pakietu `leaps`.
+
+### Wybór najepszego podzbioru
+
+```{r bestSubsets1}
+Hitters_bs_small <- regsubsets(Salary ~ ., data = Hitters)
+summary(Hitters_bs_small)
+```
+
+Jak można zobaczyć, funkcja `regsubsets()` domyślnie uwzględnia maksymalnie 8
+predyktorów. Jeśli chcemy to zmienić, musimy użyć parametru `nvmax`.
+
+```{r bestSubsets}
+Hitters_bs <- regsubsets(Salary ~ ., data = Hitters, nvmax = 19)
+Hitters_bs_sum <- summary(Hitters_bs)
+Hitters_bs_sum
+```
+
+Obiekt zwracany przez funkcję `summary.regsubsets()` zawiera informacje umożliwiające
+zidentyfikowanie globalnie najlepszego pozdbioru cech, czyli: 
+
+- wartości $R^2$ z poprawką
+
+```{r}
+Hitters_bs_sum$adjr2
+```
+
+- wartości kryterium $C_p$ Mallowa (proporcjonalne do AIC)
+
+```{r cp}
+Hitters_bs_sum$cp
+```
+
+- wartości bayesowskiego kryterium informacyjnego (BIC)
+
+```{r}
+Hitters_bs_sum$bic
+```
+
+Liczba predyktorów najlepszego podzbioru według kryterium BIC
+
+```{r bestBIC}
+bic_min <- which.min(Hitters_bs_sum$bic)
+bic_min
+```
+
+Wartość kryterium dla najlepszego podzbioru
+
+```{r}
+Hitters_bs_sum$bic[bic_min]
+```
+
+Wykres zmienności BIC dla najlepszych pozdbiorów na poszczególnych poziomach
+liczby predyktorów z zaznaczonym minimum
+
+```{r bestBICPlot}
+plot(Hitters_bs_sum$bic, xlab = "Liczba zmiennych", ylab = "BIC", col = "green",
+     type = "b", pch = 20)
+points(bic_min, Hitters_bs_sum$bic[bic_min], col = "red", pch = 9)
+```
+
+Widać, że model z 8 predyktorami jest tylko nieznacznie gorszy od optymalnego.
+
+Dostępny jest też specjalny rodzaj wykresu (`?plot.regsubsets`) szeregujący
+najlepsze podzbiory według wartości kryterium optymalności. Wersja dla BIC
+
+```{r regsubsetsPlot}
+plot(Hitters_bs, scale = "bic")
+```
+
+Estymaty współczynników regresji dla najlepszego modelu
+
+```{r}
+coef(Hitters_bs, id = bic_min)
+```
+
+Podobnie z obiektu skonstruowanego przez funkcję `summary()` można odczytać 
+zwykłe $R^2$
+
+```{r}
+Hitters_bs_sum$rsq[bic_min]
+```
+
+i RSS
+
+```{r}
+Hitters_bs_sum$rss[bic_min]
+```
+
+Niestety obiekt zwracany przez funkcję `regsubsets()` nie zawiera pełnej 
+informacji o najlepszych modelach. Po ustaleniu najlepszego modelu trzeba
+dopasować go metodą standardową.
+
+```{r}
+Hitters_bic_best <- lm("Salary ~ AtBat + Hits + Walks + CRBI + Division + PutOuts", data = Hitters)
+summary(Hitters_bic_best)
+```
+
+### Zadanie
+
+**Zrób podobną analizę dla innych kryteriów optymalności: $C_p$ i poprawionego 
+$R^2$. Zwróć uwagę na to, że poprawione $R^2$ powinno być _zmaksymalizowane_.**
+
+### Selekcja krokowa do przodu i wstecz
+
+Funkcja `regsubsets()` z odpowiednio ustawionym parametrem `method` może
+przeprowadzić selekcję krokową w przód
+
+```{r}
+Hitters_fwd <- regsubsets(Salary ~ ., data = Hitters, nvmax = 19, method = "forward")
+Hitters_fwd_sum <- summary(Hitters_fwd)
+Hitters_fwd_sum
+```
+
+i wstecz
+
+```{r}
+Hitters_back <- regsubsets(Salary ~ ., data = Hitters, nvmax = 19, method = "backward")
+Hitters_back_sum <- summary(Hitters_back)
+Hitters_back_sum
+```
+
+### Zadanie
+
+**Które podzbiory predyktorów są optymalne w selekcji krokowej w przód i wstecz
+według kryteriów BIC, $C_p$ i poprawionego $R^2$? Czy któreś z nich są faktycznie
+najlepsze?**
+
+### Wybór modelu przy pomocy metody zbioru walidacyjnego
+
+Estymaty błędów testowych będą miarodajne tylko jeśli
+wszystkie aspekty dopasowania modelu --- w tym selekcję zmiennych ---
+przeprowadzimy z użyciem wyłącznie **zbioru uczącego**.
+
+```{r valSet}
+set.seed(2025)
+n <- nrow(Hitters)
+train <- sample(n, 0.6 * n)
+test <- -train
+Hitters_bs_val <- regsubsets(Salary ~ ., data = Hitters[train,], nvmax = 19)
+```
+
+Do obliczenia błędu testowego (tu średniokwadratowego) potrzebujemy wartości
+odpowiedzi przewidywanej przez model.
+Niestety dla modeli zwracanych przez `regsubsets` nie ma odpowiedniej 
+metody `predict()`. Może ona mieć następującą postać (funkcja `model.matrix()`
+tworzy macierz $X$ dla podanych punktów).
+
+```{r predict.regsubsets}
+predict.regsubsets <- function(object, newdata, id, ...) {
+  model_formula <- as.formula(object$call[[2]])
+  mat <- model.matrix(model_formula, newdata)
+  coefs <- coef(object, id = id)
+  mat[, names(coefs)] %*% coefs
+}
+```
+
+Liczymy estymaty błędów testowych
+
+```{r valSetErrors}
+val_errors <- numeric(19)
+for (i in 1:19) {
+  y_pred <- predict(Hitters_bs_val, Hitters[test,], id = i)
+  val_errors[i] <- mean((y_pred - Hitters$Salary[test])^2)
+}
+val_errors
+```
+
+Wykres zmienności walidacyjnego MSE z zaznaczonym minimum
+
+```{r}
+val_min <- which.min(val_errors)
+plot(val_errors, xlab = "Liczba zmiennych", ylab = "MSE", col = "green", type = "b", pch = 20)
+points(val_min, val_errors[val_min], col = "red", pch = 9)
+```
+
+Po ustaleniu optymalnej liczby zmiennych wybieramy model optymalny spośród tych,
+które były uczone **przy pomocy wszystkich obserwacji**. **Nie korzystamy**
+z modeli wytrenowanych na podzbiorze danych.
+
+```{r}
+coef(Hitters_bs, id = 10)
+```
+
+Jak poprzednio, jeśli chcemy uzyskać pełny opis tego modelu musimy odwołać się
+do oryginalnej metody uczenia.
+
+```{r}
+Hitters_val_best <- 
+  lm(Salary ~ AtBat + Hits + Walks + CAtBat + CRuns + CRBI + CWalks + Division + PutOuts + Assists,
+     data = Hitters)
+summary(Hitters_val_best)
+```
+
+### Wybór modelu przy pomocy $k$-krotnej walidacji krzyżowej
+
+Musimy dopasować model na każdym z $k$ zbiorów uczących i policzyć błędy
+testowe na odpowiednich zbiorach testowych.
+
+```{r kcv}
+set.seed(2025)
+k <- 10
+folds <- sample(1:k, n, replace = TRUE)
+val_err <- NULL
+for (j in 1:k) {
+  current_train <- folds != j
+  current_test <- !current_train
+  fit_bs <- regsubsets(Salary ~ ., data = Hitters[current_train,], nvmax = 19)
+  err <- numeric(19)
+  for (i in 1:19) {
+    y_pred <- predict(fit_bs, Hitters[current_test,], id = i)
+    err[i] <- mean((y_pred - Hitters$Salary[current_test])^2)
+  }
+  val_err <- rbind(val_err, err)
+}
+cv_errors <- colMeans(val_err)
+cv_errors
+```
+
+Wykres zmienności MSE 10-krotnej walidacji krzyżowej z zaznaczonym minimum
+
+```{r kcvErrors}
+cv_min <- which.min(cv_errors)
+plot(cv_errors, xlab = "Liczba zmiennych", ylab = "MSE CV-10", col = "green", type = "b", pch = 20)
+points(cv_min, cv_errors[cv_min], col = "red", pch = 9)
+```
+
+Po ustaleniu optymalnej liczby zmiennych wybieramy model optymalny spośród tych,
+które były uczone **przy pomocy wszystkich obserwacji** (tym razem nie ma
+jednego modelu optymalnego dopasowanego na podzbiorze).
+
+```{r}
+coef(Hitters_bs, id = cv_min)
+```
+
+Pełne informacje o modelu
+
+```{r}
+Hitters_val_best <- 
+  lm(Salary ~ AtBat + Hits + Walks + CHmRun + CRuns + CWalks + Division + PutOuts, data = Hitters)
+summary(Hitters_val_best)
+```
+
+### Uogólnione modele liniowe
+
+W tym przypadku `regsubsets()` **nie działa**. Natomiast biblioteka standardowa `R`
+zawiera funkcję `step()`, która wykonuje selekcję krokową na podstawie AIC.
+
+```{r}
+library(titanic)
+titanic_step <-
+  glm(Survived ~ Pclass + Sex + Age + SibSp + Parch + Embarked, family = binomial,
+    data = na.omit(titanic_train)) |>
+  step()
+```
+
+Współczynniki modelu optymalnego
+
+```{r}
+coef(titanic_step)
+```
+
+Oczywiście `step()` działa też dla zwykłych modeli liniowych.
+
+```{r}
+step(lm(Salary ~ ., data = Hitters))
+```

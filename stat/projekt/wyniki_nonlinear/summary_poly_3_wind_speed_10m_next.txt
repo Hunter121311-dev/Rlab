@@ -1,0 +1,43 @@
+
+Call:
+lm(formula = formula_poly, data = train_data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-19.977  -0.959  -0.033   0.915  31.976 
+
+Coefficients:
+                            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                2.037e+01  5.082e-01  40.079  < 2e-16 ***
+poly(wind_speed_10m, 3)1   4.206e+03  1.433e+01 293.564  < 2e-16 ***
+poly(wind_speed_10m, 3)2  -1.064e+01  8.735e+00  -1.218 0.223110    
+poly(wind_speed_10m, 3)3  -1.920e+02  6.845e+00 -28.050  < 2e-16 ***
+poly(wind_speed_100m, 3)1  5.253e+02  1.195e+01  43.962  < 2e-16 ***
+poly(wind_speed_100m, 3)2  1.147e+02  7.509e+00  15.279  < 2e-16 ***
+poly(wind_speed_100m, 3)3  3.755e+01  5.956e+00   6.305 2.89e-10 ***
+poly(wind_gusts_10m, 3)1  -5.933e+02  8.522e+00 -69.618  < 2e-16 ***
+poly(wind_gusts_10m, 3)2  -3.030e+01  5.088e+00  -5.956 2.59e-09 ***
+poly(wind_gusts_10m, 3)3   1.067e+02  3.699e+00  28.853  < 2e-16 ***
+wind_dir_sin               8.690e-02  5.458e-03  15.922  < 2e-16 ***
+wind_dir_cos              -1.023e-01  6.538e-03 -15.646  < 2e-16 ***
+temperature_2m            -5.259e-02  1.528e-02  -3.443 0.000576 ***
+relative_humidity_2m       2.329e-02  2.650e-03   8.786  < 2e-16 ***
+dew_point_2m              -1.112e-01  1.359e-02  -8.185 2.74e-16 ***
+apparent_temperature       1.146e-01  9.958e-03  11.503  < 2e-16 ***
+precipitation              2.132e-01  1.309e-02  16.280  < 2e-16 ***
+cloud_cover                2.149e-03  1.161e-04  18.510  < 2e-16 ***
+pressure_msl              -3.474e-03  4.250e-04  -8.173 3.03e-16 ***
+shortwave_radiation        1.301e-03  4.086e-05  31.843  < 2e-16 ***
+is_day                    -1.494e-01  1.482e-02 -10.079  < 2e-16 ***
+sin_dzien                 -1.224e-01  8.495e-03 -14.410  < 2e-16 ***
+cos_dzien                 -1.747e-01  1.714e-02 -10.192  < 2e-16 ***
+sin_godzina                2.368e-01  5.544e-03  42.720  < 2e-16 ***
+cos_godzina               -2.251e-01  1.225e-02 -18.382  < 2e-16 ***
+polrocze_cieple           -1.985e-02  1.708e-02  -1.162 0.245270    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.77 on 229173 degrees of freedom
+Multiple R-squared:  0.9586,	Adjusted R-squared:  0.9586 
+F-statistic: 2.121e+05 on 25 and 229173 DF,  p-value: < 2.2e-16
+

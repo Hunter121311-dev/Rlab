@@ -1,0 +1,21 @@
+"target","model","parametr","estimate","std_error","statistic","p_value"
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","(Intercept)",-9.41481645580525,0.0749240472085439,-125.658140564671,0
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","wind_speed_10m_z",8.87806332850712,0.14653307579515,60.5874358422563,0
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","wind_speed_100m_z",1.06804289293825,0.10966200611931,9.7394068441192,2.04745947100575e-22
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","wind_gusts_10m_z",-1.02599129977862,0.0686067800461587,-14.9546633596319,1.45214169562119e-50
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","wind_dir_sin_z",-0.0116368388247784,0.0168959256521183,-0.688736389137668,0.490989172171558
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","wind_dir_cos_z",-0.0671690513790792,0.0181558994945315,-3.69957166811318,0.000215963649320155
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","temperature_2m_z",-0.722829296542972,0.510306128816494,-1.41646211112409,0.156640249873574
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","relative_humidity_2m_z",0.352927110449212,0.11548147033906,3.05613627375024,0.00224209327754457
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","dew_point_2m_z",-1.2099884546865,0.37231830647066,-3.24987633876083,0.00115455201483032
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","apparent_temperature_z",1.8144388791132,0.488465412846404,3.71456981680655,0.000203549667784662
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","precipitation_z",0.0551445290594816,0.0137027800761399,4.02433146799914,5.71373940707327e-05
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","cloud_cover_z",0.0987201567012924,0.0185260917394385,5.32870926527564,9.89131848702939e-08
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","pressure_msl_z",-0.0477338115104902,0.0153506794847332,-3.10955691296684,0.00187368183616865
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","shortwave_radiation_z",0.141192116765732,0.0338582195434007,4.17009868415399,3.04467768819013e-05
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","is_day_z",0.0358377739920809,0.0292793823279029,1.22399351156831,0.220954675222878
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","sin_dzien_z",-0.117448752898389,0.0285824117658485,-4.10912675461214,3.97158052986973e-05
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","cos_dzien_z",-0.11882803397608,0.0558944022912751,-2.12593800282266,0.0335084220575678
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","sin_godzina_z",0.193559438699895,0.0151256028455413,12.7968082116444,1.70829376858569e-37
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","cos_godzina_z",-0.110555633714205,0.0317496116099347,-3.48210979940337,0.00049747966243662
+"wind_speed_10m_next_event","GLMM RIFS miesiac plus dzien_roku","polrocze_cieple_z",0.0493591643252718,0.0447219332440805,1.10369030909023,0.269727500854684

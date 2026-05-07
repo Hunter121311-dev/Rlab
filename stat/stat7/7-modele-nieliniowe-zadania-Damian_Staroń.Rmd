@@ -1,0 +1,356 @@
+---
+title: "Modele nieliniowe - zadania — rozwiązanie"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+### Zadanie 1
+
+Zadanie dotyczy zbioru `Boston`. Ustal zbiór walidacyjny (testowy) zawierający
+20% losowo wybranych danych (ziarno generatora ustaw na swój numer albumu).
+Licząc błąd średniokwadratowy na tym zbiorze ustal optymalny stopień wielomianu
+(między 1 a 10) w regresji wielomianowej `medv` względem `lstat` (modele mają
+być uczone na danych nienależących do zbioru walidacyjnego). Optymalnym modelem
+jest ten, który uzyskuje najmniejszą estymatę błędu testowego.
+
+```{r}
+library(MASS)
+
+data(Boston)
+
+nr_albumu <- 435515
+set.seed(nr_albumu)
+
+n <- nrow(Boston)
+test_id <- sample(seq_len(n), size = floor(0.20 * n))
+
+Boston_train <- Boston[-test_id, ]
+Boston_test  <- Boston[test_id, ]
+
+mse_poly <- sapply(1:10, function(deg) {
+  fit <- lm(medv ~ poly(lstat, deg), data = Boston_train)
+  pred <- predict(fit, newdata = Boston_test)
+  mean((Boston_test$medv - pred)^2)
+})
+
+wyniki_poly <- data.frame(
+  stopien = 1:10,
+  MSE = mse_poly
+)
+
+wyniki_poly
+
+optymalny_stopien <- wyniki_poly$stopien[which.min(wyniki_poly$MSE)]
+optymalny_stopien
+
+plot(
+  wyniki_poly$stopien, wyniki_poly$MSE,
+  type = "b", pch = 19,
+  xlab = "Stopień wielomianu",
+  ylab = "MSE na zbiorze walidacyjnym",
+  main = "Walidacyjny wybór stopnia wielomianu"
+)
+abline(v = optymalny_stopien, lty = 2)
+```
+
+**Komentarz.** Na podstawie błędu MSE liczonego na 20-procentowym zbiorze
+walidacyjnym najlepszy wynik uzyskał wielomian `r optymalny_stopien`-go stopnia.
+Dla wyższych stopni wielomianu błąd walidacyjny nie maleje dalej, więc bardziej
+złożone modele nie poprawiają jakości predykcji na danych testowych. Wynik może
+zależeć od numeru albumu użytego jako ziarno generatora losowego.
+
+### Zadanie 2
+
+Zadanie dotyczy zbioru danych `Abalone` z repozytorium UCI ML. Zawiera on dane
+z pomiarów cech fizycznych uchowców, czyli abalone. Interesuje nas zależność
+wieku osobnika, wyrażonego liczbą pierścieni `Rings`, od pozostałych parametrów.
+
+```{r}
+# Wersja z pakietem ucimlrepo zgodna ze szkieletem zadania.
+library(ucimlrepo)
+
+abalone_file <- "abalone_uci.rds"
+if (!file.exists(abalone_file)) {
+  abalone_uci <- fetch_ucirepo("Abalone")
+  saveRDS(abalone_uci, file = abalone_file)
+} else {
+  abalone_uci <- readRDS(abalone_file)
+}
+
+abalone <- abalone_uci$data$original
+abalone$Sex <- as.factor(abalone$Sex)
+head(abalone)
+```
+
+Zmienna `Whole_weight` jest praktycznie liniowo zależna od pozostałych parametrów
+wagi. Sprawdzam to, regresując `Whole_weight` na trzy pozostałe zmienne wagowe.
+
+```{r}
+summary(lm(
+  Whole_weight ~ Shucked_weight + Viscera_weight + Shell_weight,
+  data = abalone
+))
+```
+
+**Komentarz.** Wartość współczynnika determinacji jest bardzo wysoka, około
+`R^2 = 0.991`, co oznacza, że `Whole_weight` jest niemal liniowo wyjaśniane
+przez pozostałe zmienne wagowe. Pozostawienie tej zmiennej w modelu mogłoby
+prowadzić do silnej współliniowości, dlatego usuwam ją z dalszej analizy.
+
+```{r}
+abalone_m <- subset(abalone, select = -Whole_weight)
+```
+
+Po pierwsze dopasowuję model regresji Poissonowskiej, ponieważ liczba pierścieni
+`Rings` jest zmienną całkowitoliczbową.
+
+```{r}
+abalone_fit_0 <- glm(
+  Rings ~ .,
+  data = abalone_m,
+  family = poisson(link = "log")
+)
+
+summary(abalone_fit_0)
+drop1(abalone_fit_0, test = "Chisq")
+```
+
+**Komentarz.** Na podstawie testów ilorazu wiarygodności z funkcji `drop1`
+najmniej istotnym predyktorem jest `Viscera_weight`. Jego usunięcie nie powoduje
+istotnego pogorszenia modelu, więc usuwam tę zmienną w pierwszym kroku selekcji.
+
+```{r}
+abalone_fit_1 <- update(abalone_fit_0, . ~ . - Viscera_weight)
+summary(abalone_fit_1)
+drop1(abalone_fit_1, test = "Chisq")
+```
+
+**Komentarz.** Po usunięciu `Viscera_weight` kolejną nieistotną zmienną jest
+`Length`. Zmienna `Sex` pozostaje w modelu jako cały czynnik, ponieważ test
+`drop1` sprawdza łączny efekt całej zmiennej kategorialnej, a nie istotność
+pojedynczych poziomów czynnika.
+
+```{r}
+abalone_fit <- update(abalone_fit_1, . ~ . - Length)
+summary(abalone_fit)
+drop1(abalone_fit, test = "Chisq")
+```
+
+Finalny model Poissonowski bez składników nieliniowych ma więc postać:
+
+```{r}
+formula(abalone_fit)
+```
+
+**Komentarz.** Finalny model liniowy na skali logarytmicznej zawiera zmienne
+`Sex`, `Diameter`, `Height`, `Shucked_weight` oraz `Shell_weight`. Wszystkie te
+predyktory są istotne w teście usunięcia pojedynczego składnika z modelu.
+
+Następnie sprawdzam, czy lepszego modelu nie da się uzyskać przy pomocy
+nieliniowych transformacji predyktorów. W tym celu do wszystkich istotnych
+predyktorów numerycznych zastosowano nieparametryczne transformacje wygładzające.
+
+```{r}
+library(gam)
+
+abalone_n_fit_0 <- gam(
+  Rings ~ Sex +
+    s(Diameter, df = 6) +
+    s(Height, df = 6) +
+    s(Shucked_weight, df = 6) +
+    s(Shell_weight, df = 6),
+  data = abalone_m,
+  family = poisson(link = "log")
+)
+
+summary(abalone_n_fit_0)
+anova(abalone_n_fit_0, test = "Chisq")
+```
+
+**Komentarz.** Przy `df = 6` istotne części nieparametryczne występują dla
+wszystkich czterech predyktorów numerycznych: `Diameter`, `Height`,
+`Shucked_weight` oraz `Shell_weight`. Dlatego w finalnym modelu GAM pozostawiam
+wygładzenia dla wszystkich tych zmiennych.
+
+```{r}
+abalone_n_fit <- gam(
+  Rings ~ Sex +
+    s(Diameter, df = 6) +
+    s(Height, df = 6) +
+    s(Shucked_weight, df = 6) +
+    s(Shell_weight, df = 6),
+  data = abalone_m,
+  family = poisson(link = "log")
+)
+
+summary(abalone_n_fit)
+anova(abalone_n_fit, test = "Chisq")
+```
+
+Porównuję oba finalne modele przy pomocy testu ANOVA.
+
+```{r}
+anova(abalone_fit, abalone_n_fit, test = "Chisq")
+
+# Ręcznie ta sama idea: test ilorazu wiarygodności na spadku dewiancji.
+lr_stat <- abalone_fit$deviance - abalone_n_fit$deviance
+df_diff <- abalone_fit$df.residual - abalone_n_fit$df.residual
+p_value <- pchisq(lr_stat, df = df_diff, lower.tail = FALSE)
+
+data.frame(
+  model_liniowy_deviance = abalone_fit$deviance,
+  model_nieliniowy_deviance = abalone_n_fit$deviance,
+  roznica_dewiancji = lr_stat,
+  roznica_df = df_diff,
+  p_value = p_value
+)
+```
+
+**Komentarz.** Test ANOVA porównujący model Poissonowski bez wygładzeń z modelem
+GAM wskazuje na istotne zmniejszenie dewiancji po dodaniu składników
+nieliniowych. Oznacza to, że zależność liczby pierścieni od predyktorów
+numerycznych nie jest w pełni liniowa. Lepszym modelem jest więc model GAM.
+Dodatkowo model GAM ma niższą wartość AIC niż model liniowy Poissona, co również
+przemawia za wyborem modelu nieliniowego.
+
+Wykonuję wykresy PDP dla obu modeli.
+
+```{r}
+library(pdp)
+library(ggplot2)
+
+pred_rings <- function(object, newdata) {
+  as.numeric(predict(object, newdata = newdata, type = "response"))
+}
+
+pdp_vars <- c("Sex", "Diameter", "Height", "Shucked_weight", "Shell_weight")
+
+plot_pdp <- function(model, vars, title_prefix, train_data = abalone_m) {
+  for (v in vars) {
+    pd <- partial(
+      object = model,
+      pred.var = v,
+      train = train_data,
+      pred.fun = pred_rings,
+      grid.resolution = 50,
+      plot = FALSE
+    )
+    
+    print(
+      autoplot(pd, rug = TRUE, train = train_data) +
+        labs(
+          title = paste(title_prefix, v),
+          y = "PDP: przewidywana liczba Rings"
+        )
+    )
+  }
+}
+```
+
+PDP dla modelu bez składników nieparametrycznych.
+
+```{r}
+plot_pdp(abalone_fit, pdp_vars, "Model Poissonowski — PDP dla")
+```
+
+PDP dla modelu ze składnikami nieparametrycznymi.
+
+```{r}
+plot_pdp(abalone_n_fit, pdp_vars, "Model GAM Poissonowski — PDP dla")
+```
+
+**Komentarz.** Wykresy PDP pokazują różnicę między modelem liniowym Poissona a
+modelem GAM. W modelu liniowym wpływ zmiennych numerycznych jest wymuszony przez
+liniową postać predyktora na skali logarytmicznej. Model GAM pozwala natomiast
+uchwycić krzywiznę zależności, szczególnie dla zmiennych wagowych oraz wymiarów
+osobnika. Widoczne odstające wartości dla `Height` mogą wpływać na kształt
+wygładzenia dla tej zmiennej.
+
+### Zagadnienia dla zainteresowanych
+
+Zbiór zawiera dane wyraźnie odstające. Widać je na wykresach PDP, zwłaszcza dla
+zmiennej `Height`.
+
+- Ile jest takich obserwacji wyraźnie odstających względem `Height`? Które to są?
+
+```{r}
+# Dwie obserwacje mają Height = 0, a dwie mają Height skrajnie większe niż reszta.
+height_out_id <- which(abalone_m$Height == 0 | abalone_m$Height > 0.4)
+height_out_id
+abalone_m[height_out_id, ]
+```
+
+**Komentarz.** Za obserwacje odstające względem `Height` uznaję dwa przypadki
+z wysokością równą 0 oraz dwa przypadki z bardzo dużą wysokością względem
+pozostałych danych. Łącznie są to 4 obserwacje: `1258`, `1418`, `2052` oraz
+`3997`.
+
+- Czy modele zmieniają się istotnie po usunięciu tych obserwacji? W szczególności
+czy któreś składniki nieliniowe przestają być istotne?
+
+```{r}
+abalone_clean <- abalone_m[-height_out_id, ]
+
+abalone_fit_clean_0 <- glm(
+  Rings ~ .,
+  data = abalone_clean,
+  family = poisson(link = "log")
+)
+
+drop1(abalone_fit_clean_0, test = "Chisq")
+
+abalone_fit_clean <- glm(
+  Rings ~ Sex + Diameter + Height + Shucked_weight + Shell_weight,
+  data = abalone_clean,
+  family = poisson(link = "log")
+)
+summary(abalone_fit_clean)
+drop1(abalone_fit_clean, test = "Chisq")
+```
+
+```{r}
+abalone_n_clean_0 <- gam(
+  Rings ~ Sex +
+    s(Diameter, df = 6) +
+    s(Height, df = 6) +
+    s(Shucked_weight, df = 6) +
+    s(Shell_weight, df = 6),
+  data = abalone_clean,
+  family = poisson(link = "log")
+)
+
+summary(abalone_n_clean_0)
+anova(abalone_n_clean_0, test = "Chisq")
+```
+
+**Komentarz.** Po usunięciu obserwacji odstających względem `Height` część
+nieliniowa dla `Height` przestaje być istotna. Istotne pozostają natomiast
+składniki nieliniowe dla `Diameter`, `Shucked_weight` oraz `Shell_weight`.
+Oznacza to, że wcześniejsza nieliniowość dla `Height` była w dużej mierze
+efektem obserwacji odstających.
+
+```{r}
+abalone_n_clean <- gam(
+  Rings ~ Sex +
+    s(Diameter, df = 6) +
+    Height +
+    s(Shucked_weight, df = 6) +
+    s(Shell_weight, df = 6),
+  data = abalone_clean,
+  family = poisson(link = "log")
+)
+
+summary(abalone_n_clean)
+anova(abalone_n_clean, test = "Chisq")
+anova(abalone_fit_clean, abalone_n_clean, test = "Chisq")
+```
+
+**Wniosek końcowy.** Po usunięciu obserwacji odstających model nadal korzysta ze
+składników nieliniowych, ale zmienia się ich interpretacja: `Height` może zostać
+w modelu jako składnik liniowy, natomiast wygładzenia dla `Diameter`,
+`Shucked_weight` oraz `Shell_weight` pozostają istotne. Model GAM nadal istotnie
+zmniejsza dewiancję względem modelu Poissonowskiego bez składników
+nieparametrycznych.

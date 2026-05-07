@@ -1,0 +1,337 @@
+---
+title: "Regularyzacja w modelach liniowych"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+library(glmnet)
+```
+
+## Regularyzacja
+
+Obie omawiane na wykładzie metody regularyzacji są zaimplementowane w funkcji
+`glmnet()` z pakietu `glmnet`. Używamy zbioru danych `Hitters` z pakietu `ISLR`. 
+Należy usunąć wiersze zawierające wartości `NA`. 
+
+```{r na.omit}
+Hitters <- na.omit(Hitters)
+```
+
+Funkcja `glmnet::glmnet()` ma składnię odmienną od `lm()` i jej podobnych. Dane
+wejściowe muszą być podane odmiennie. Trzeba w szczególności samodzielnie 
+skonstruować macierz $\mathbf{X}$ (pomijamy pierwszą kolumnę odpowiadającą
+wyrazowi wolnemu)
+
+```{r modelmatrix}
+X <- model.matrix(Salary ~ ., data = Hitters)[, -1]
+y <- Hitters$Salary
+```
+
+Argument `alpha` funkcji `glmnet()` oznacza parametr mieszający w *elastic-net*:
+`0` oznacza regresję grzbietową, a `1` lasso.
+
+### Regresja grzbietowa
+
+Wykonujemy regresję grzbietową dla jawnie określonych wartości $\lambda$. 
+**Podany ciąg $\lambda$ powinien być malejący**.
+Funkcja `glmnet()` domyślnie dokonuje standaryzacji zmiennych.
+
+```{r ridge}
+lambda_grid <- 10^seq(10, -2, length.out = 100)
+fit_ridge_0 <- glmnet(X, y, alpha = 0, lambda = lambda_grid)
+plot(fit_ridge_0, xvar = "lambda")
+```
+
+Na ogół lepszym pomysłem jest pozostawienie funkcji `glmnet()`
+skonstruowania konkretnego ciągu $\lambda$ na podstawie argumentów
+`nlambda` i `lambda.min.ratio` (`?glmnet`). Argumenty te mają też sensowne
+wartości domyślne.
+
+```{r}
+fit_ridge <- glmnet(X, y, alpha = 0, nlambda = 200, lambda.min.ratio = 1e-5)
+plot(fit_ridge, xvar = "lambda")
+```
+
+Wygenerowany ciąg wartości $\lambda$ jest dostępny w składowej obiektu modelu
+
+```{r}
+plot(fit_ridge$lambda, pch = 20, ylab = expression(lambda))
+legend(
+  "topright", 
+  legend = paste(
+    c("max = ", "min = "), 
+    fit_ridge$lambda[c(1, 200)] |> round(3)
+    )
+  )
+```
+
+Dla każdej wartości $\lambda$ otrzymujemy zestaw estymat predyktorów
+dostępnych w postaci macierzy
+
+```{r ridgecoefs}
+head(coef(fit_ridge), n = c(20, 6))
+```
+
+Można sprawdzić, że większe wartości $\lambda$ dają zasadniczo mniejszą normę 
+euklidesową współczynników (pomijamy wyraz wolny).
+
+```{r ridgeCoefNormSmall}
+coefs <- coef(fit_ridge)[-1,]
+plot(colSums(coefs^2) |> sqrt(), ylab = "Norma L2", type = "l")
+```
+
+Przy pomocy funkcji `predict.glmnet()` można uzyskać np. wartości estymat
+współczynników dla nowej wartości $\lambda$ (np. 50)
+
+```{r predictGlmnet}
+predict(fit_ridge, s = 50, type = "coefficients")
+```
+
+Estymujemy testowy MSE. Ustawienie progu zbieżności metody optymalizacji 
+`thresh` na niską wartość może skutkować wyższą dokładnością predykcji.
+
+```{r ridgemse}
+set.seed(1)
+n <- nrow(X)
+train <- sample(n, 0.6 * n)
+test <- -train
+fit_ridge_train <- 
+  glmnet(X[train,], y[train], alpha = 0, nlambda = 200, lambda.min.ratio = 1e-5, thresh = 1e-12)
+```
+
+MSE dla $\lambda = 4$
+
+```{r ridgemse4}
+y_pred_4 <- predict(fit_ridge_train, s = 4, newx = X[test,])
+mean((y_pred_4 - y[test])^2)
+```
+
+Testowy MSE dla modelu zerowego (sam wyraz wolny)
+
+```{r ridgenullmse}
+y_pred_null <- mean(y[train])
+mean((y_pred_null - y[test])^2)
+```
+
+Testowy MSE dla bardzo dużej wartości $\lambda = 10^{7}$
+
+```{r ridgemse1e10}
+y_pred_inf <- predict(fit_ridge_train, s = 1e7, newx = X[test,])
+mean((y_pred_inf - y[test])^2)
+```
+
+[**Jak wygląda porównanie?**]
+
+Testowy MSE dla $\lambda = 0$ (metoda najmniejszych kwadratów)
+
+```{r ridgemse0}
+y_pred_0 <- predict(fit_ridge_train, x = X[train,], y = y[train], s = 0, 
+                      newx = X[test,], exact = TRUE)
+mean((y_pred_0 - y[test])^2)
+```
+
+Porównanie estymat współczynników:
+
+- standardowa metoda najmniejszych kwadratów,
+
+- regresja grzbietowa dla $\lambda = 0$ z dodaniem tej wartości do rozważanego
+ciągu i ponownym dopasowaniu,
+
+- regresja grzbietowa dla $\lambda = 0$ z obliczeniem współczynników regresji
+przy pomocy interpolacji liniowej.
+
+```{r ridgelm}
+lm(y ~ X, subset = train)
+predict(fit_ridge_train, x = X[train,], y = y[train], s = 0, exact = TRUE, 
+        type = "coefficients")[,]
+predict(fit_ridge_train, s = 0, type = "coefficients")[,]
+```
+
+Wyliczenie optymalnej i *akceptowalnej* wartości $\lambda$ przy pomocy walidacji 
+krzyżowej
+
+```{r ridgecv}
+set.seed(1)
+fit_ridge_train_cv <- cv.glmnet(X[train,], y[train], alpha = 0)
+c(fit_ridge_train_cv$lambda.min, fit_ridge_train_cv$lambda.1se)
+```
+
+Wykres błędu CV
+
+```{r}
+plot(fit_ridge_train_cv)
+```
+
+Walidacyjne MSE dla optymalnego $\lambda$
+
+```{r}
+y_pred_opt <- predict(fit_ridge_train, s = fit_ridge_train_cv$lambda.min, newx = X[test,])
+mean((y_pred_opt - y[test])^2)
+```
+
+i dla akceptowalnego $\lambda$
+
+```{r}
+y_pred_1se <- predict(fit_ridge_train, s = fit_ridge_train_cv$lambda.1se, newx = X[test,])
+mean((y_pred_1se - y[test])^2)
+```
+
+Wykres walidacyjnego MSE
+
+```{r}
+pred_y <- function(lambda) {
+  y_pred <- predict(fit_ridge_train, s = lambda, newx = X[test,])
+  mean((y_pred - y[test])^2)
+}
+ys_pred <- sapply(fit_ridge_train$lambda, pred_y)
+plot(ys_pred ~ log(fit_ridge_train$lambda), type = "l", ylab = "MSE")
+abline(v = log(fit_ridge_train_cv$lambda.min), lty = "dotted")
+abline(v = log(fit_ridge_train_cv$lambda.1se), lty = "dotted")
+```
+
+Estymaty współczynników dla optymalnego $\lambda$ obliczamy na pełnym zbiorze
+danych.
+
+```{r}
+fit_ridge_full <- glmnet(X, y, alpha = 0)
+predict(fit_ridge_full, s = fit_ridge_train_cv$lambda.min, type = "coefficients")[,]
+```
+
+### Lasso
+
+Dopasowujemy lasso z domyślnymi ustawieniami $\lambda$
+
+```{r lasso}
+fit_lasso_train <- glmnet(X[train,], y[train], alpha = 1)
+plot(fit_lasso_train, xvar = "lambda")
+```
+
+Wykonujemy walidację krzyżową
+
+```{r}
+fit_lasso_train_cv <- cv.glmnet(X[train,], y[train], alpha = 1)
+c(fit_lasso_train_cv$lambda.min, fit_lasso_train_cv$lambda.1se)
+```
+
+Wykres MSE CV
+
+```{r}
+plot(fit_lasso_train_cv)
+```
+
+Walidacyjne MSE dla optymalnego $\lambda$
+
+```{r}
+y_pred_opt <- predict(fit_lasso_train, s = fit_lasso_train_cv$lambda.min, newx = X[test,])
+mean((y_pred_opt - y[test])^2)
+```
+
+i dla akceptowalnego $\lambda$
+
+```{r}
+y_pred_1se <- predict(fit_lasso_train, s = fit_lasso_train_cv$lambda.1se, newx = X[test,])
+mean((y_pred_1se - y[test])^2)
+```
+
+Wykres walidacyjnego MSE
+
+```{r}
+pred_y <- function(lambda) {
+  y_pred <- predict(fit_lasso_train, s = lambda, newx = X[test,])
+  mean((y_pred - y[test])^2)
+}
+ys_pred <- sapply(fit_lasso_train$lambda, pred_y)
+plot(ys_pred ~ log(fit_lasso_train$lambda), type = "l", ylab = "MSE")
+abline(v = log(fit_lasso_train_cv$lambda.min), lty = "dotted")
+abline(v = log(fit_lasso_train_cv$lambda.1se), lty = "dotted")
+```
+
+Estymaty współczynników dla optymalnego $\lambda$ (model dopasowany na całym
+zbiorze danych).
+
+```{r}
+fit_lasso_full <- glmnet(X, y, alpha = 1)
+predict(fit_lasso_full, s = fit_lasso_train_cv$lambda.min, type = "coefficients")[,]
+```
+
+Estymaty współczynników dla akceptowalnego $\lambda$ (model dopasowany na całym
+zbiorze danych).
+
+```{r}
+predict(fit_lasso_full, s = fit_lasso_train_cv$lambda.1se, type = "coefficients")[,]
+```
+
+### Zadanie
+
+Porównaj błędy walidacyjne optymalnych modeli regresji grzbietowej, lassa i
+metody wyboru najlepszego podzbioru z różnymi kryteriami optymalności.
+
+## Uogólnione modele liniowe
+
+`glmnet()` działa też dla szerokiej klasy GLM (patrz `?glmnet`). Przykład 
+regresji Poissonowskiej z poprzednich zajęć.
+
+```{r}
+library(MixAll) |> suppressPackageStartupMessages()
+data(DebTrivedi)
+dt <- DebTrivedi[-(2:5)]
+dt_X <- model.matrix(ofp ~ ., data = dt)[, -1]
+dt_y <- dt$ofp
+
+set.seed(2025)
+train <- sample(nrow(dt), 0.75 * nrow(dt))
+test <- -train
+
+dt_lasso_train_fit <- glmnet(dt_X[train,], dt_y[train], family = "poisson", alpha = 1)
+plot(dt_lasso_train_fit, xvar = "lambda")
+```
+
+Wykres błędu CV
+
+```{r}
+dt_lasso_train_cv <- cv.glmnet(dt_X[train,], dt_y[train], family = "poisson", alpha = 1)
+plot(dt_lasso_train_cv)
+```
+
+Wykres błędu walidacyjnego. W tym przypadku stosowana jest miara uniwersalna
+dla GLM, czyli średnie **odchylenie**
+$$
+  D = \frac1n \Bigl( 2 l(\beta_s | (x_i, y_i)) - 2 l (\beta | (x_i, y_i)) \Bigr)
+$$
+gdzie $\beta$ są współczynnikami aktualnego modelu, a $\beta_s$ współczynnikami
+modelu *nasyconego*. Ten ostatni w przypadku regresji Poissonowskiej jest łatwy
+do wyznaczenia: jest to model, w którym przewidywana wartość średnia dla
+$(x_i, y_i)$ jest równa $y_i$, czyli
+$$
+  P(Y = y_i) = e^{-y_i} \frac{y_i^{y_i}}{y_i !}.
+$$
+
+```{r}
+y_t <- dt_y[test]
+loglik_saturated <- sum(dpois(y_t, lambda = y_t, log = TRUE))
+
+dev <- function(lambda) {
+  pois_mean_pred <- predict(dt_lasso_train_fit, s = lambda, newx = dt_X[test,], type = "response")
+  loglik_current <- sum(dpois(y_t, lambda = pois_mean_pred, log = TRUE))
+  2 * (loglik_saturated - loglik_current) / length(y_t)
+}
+
+dev_test <- sapply(dt_lasso_train_cv$lambda, dev)
+plot(dev_test ~ log(dt_lasso_train_cv$lambda), type = "l", ylab = "Dev")
+abline(v = log(dt_lasso_train_cv$lambda.min), lty = "dotted")
+abline(v = log(dt_lasso_train_cv$lambda.1se), lty = "dotted")
+```
+
+Estymaty współczynników dla optymalnego $\lambda$
+
+```{r}
+dt_lasso_fit <- glmnet(dt_X, dt_y, family = "poisson", alpha = 1)
+predict(dt_lasso_fit, s = dt_lasso_train_cv$lambda.min, type = "coefficients")[,]
+```
+Estymaty współczynników dla akceptowalnego $\lambda$
+
+```{r}
+predict(dt_lasso_fit, s = dt_lasso_train_cv$lambda.1se, type = "coefficients")[,]
+```

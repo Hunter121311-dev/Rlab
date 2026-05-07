@@ -1,0 +1,58 @@
+
+Call:
+lm(formula = formula_ns, data = train_data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-20.051  -0.959  -0.034   0.913  32.157 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   3.492e+00  5.142e-01   6.790 1.13e-11 ***
+ns(wind_speed_10m, df = 8)1   9.437e+00  1.029e-01  91.746  < 2e-16 ***
+ns(wind_speed_10m, df = 8)2   1.244e+01  1.109e-01 112.154  < 2e-16 ***
+ns(wind_speed_10m, df = 8)3   1.546e+01  1.121e-01 137.968  < 2e-16 ***
+ns(wind_speed_10m, df = 8)4   1.862e+01  1.170e-01 159.081  < 2e-16 ***
+ns(wind_speed_10m, df = 8)5   2.260e+01  1.222e-01 184.986  < 2e-16 ***
+ns(wind_speed_10m, df = 8)6   3.887e+01  1.781e-01 218.183  < 2e-16 ***
+ns(wind_speed_10m, df = 8)7   5.582e+01  4.122e-01 135.406  < 2e-16 ***
+ns(wind_speed_10m, df = 8)8   5.910e+01  7.000e-01  84.430  < 2e-16 ***
+ns(wind_speed_100m, df = 8)1  1.031e+00  8.494e-02  12.143  < 2e-16 ***
+ns(wind_speed_100m, df = 8)2  1.117e+00  9.521e-02  11.734  < 2e-16 ***
+ns(wind_speed_100m, df = 8)3  1.462e+00  9.367e-02  15.613  < 2e-16 ***
+ns(wind_speed_100m, df = 8)4  1.739e+00  9.835e-02  17.686  < 2e-16 ***
+ns(wind_speed_100m, df = 8)5  2.147e+00  1.017e-01  21.108  < 2e-16 ***
+ns(wind_speed_100m, df = 8)6  4.078e+00  1.477e-01  27.617  < 2e-16 ***
+ns(wind_speed_100m, df = 8)7  9.648e+00  3.677e-01  26.242  < 2e-16 ***
+ns(wind_speed_100m, df = 8)8  1.436e+01  6.234e-01  23.044  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)1  -1.256e-01  7.467e-02  -1.682 0.092490 .  
+ns(wind_gusts_10m, df = 8)2  -6.199e-01  8.663e-02  -7.155 8.37e-13 ***
+ns(wind_gusts_10m, df = 8)3  -1.051e+00  8.375e-02 -12.547  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)4  -1.526e+00  8.767e-02 -17.409  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)5  -2.216e+00  8.956e-02 -24.742  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)6  -5.491e+00  1.285e-01 -42.742  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)7  -5.845e+00  2.931e-01 -19.942  < 2e-16 ***
+ns(wind_gusts_10m, df = 8)8  -6.910e+00  4.849e-01 -14.250  < 2e-16 ***
+wind_dir_sin                  8.728e-02  5.455e-03  16.000  < 2e-16 ***
+wind_dir_cos                 -1.014e-01  6.547e-03 -15.483  < 2e-16 ***
+temperature_2m               -5.746e-02  1.528e-02  -3.761 0.000169 ***
+relative_humidity_2m          2.343e-02  2.650e-03   8.840  < 2e-16 ***
+dew_point_2m                 -1.117e-01  1.358e-02  -8.225  < 2e-16 ***
+apparent_temperature          1.197e-01  9.949e-03  12.027  < 2e-16 ***
+precipitation                 2.191e-01  1.308e-02  16.753  < 2e-16 ***
+cloud_cover                   2.084e-03  1.161e-04  17.949  < 2e-16 ***
+pressure_msl                 -3.445e-03  4.246e-04  -8.115 4.88e-16 ***
+shortwave_radiation           1.305e-03  4.089e-05  31.916  < 2e-16 ***
+is_day                       -1.534e-01  1.482e-02 -10.348  < 2e-16 ***
+sin_dzien                    -1.163e-01  8.497e-03 -13.689  < 2e-16 ***
+cos_dzien                    -1.680e-01  1.715e-02  -9.796  < 2e-16 ***
+sin_godzina                   2.343e-01  5.539e-03  42.306  < 2e-16 ***
+cos_godzina                  -2.233e-01  1.223e-02 -18.255  < 2e-16 ***
+polrocze_cieple              -2.079e-02  1.706e-02  -1.218 0.223089    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.768 on 229158 degrees of freedom
+Multiple R-squared:  0.9587,	Adjusted R-squared:  0.9587 
+F-statistic: 1.33e+05 on 40 and 229158 DF,  p-value: < 2.2e-16
+

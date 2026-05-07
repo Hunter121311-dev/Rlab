@@ -1,0 +1,10 @@
+"zmienna","IRR"
+"(Intercept)",1.43965501350766
+"mean_wind_10m",1.04360629600687
+"max_gusts_10m",0.986132144875096
+"mean_pressure",1.00061659427886
+"sum_precipitation",0.994594474500631
+"mean_cloud_cover",1.00019764570836
+"day_hours",1.08606693965566
+"sin_dzien",0.985252519387925
+"cos_dzien",1.01161042540124

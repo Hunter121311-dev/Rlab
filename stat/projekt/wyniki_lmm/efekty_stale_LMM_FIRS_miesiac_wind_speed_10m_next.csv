@@ -1,0 +1,21 @@
+"target","model","parametr","estimate"
+"wind_speed_10m_next","LMM FIRS miesiac","(Intercept)",18.4567667274294
+"wind_speed_10m_next","LMM FIRS miesiac","wind_speed_10m_z",8.77715203761431
+"wind_speed_10m_next","LMM FIRS miesiac","wind_speed_100m_z",0.809149133179803
+"wind_speed_10m_next","LMM FIRS miesiac","wind_gusts_10m_z",-0.986467196416792
+"wind_speed_10m_next","LMM FIRS miesiac","wind_dir_sin_z",0.0491678549669631
+"wind_speed_10m_next","LMM FIRS miesiac","wind_dir_cos_z",-0.0646427020620728
+"wind_speed_10m_next","LMM FIRS miesiac","temperature_2m_z",-0.400609121969831
+"wind_speed_10m_next","LMM FIRS miesiac","relative_humidity_2m_z",0.21688139837561
+"wind_speed_10m_next","LMM FIRS miesiac","dew_point_2m_z",-0.627535182206401
+"wind_speed_10m_next","LMM FIRS miesiac","apparent_temperature_z",0.94193001336205
+"wind_speed_10m_next","LMM FIRS miesiac","precipitation_z",0.0669385430430901
+"wind_speed_10m_next","LMM FIRS miesiac","cloud_cover_z",0.082037484337658
+"wind_speed_10m_next","LMM FIRS miesiac","pressure_msl_z",-0.0414415800540688
+"wind_speed_10m_next","LMM FIRS miesiac","shortwave_radiation_z",0.236391926890598
+"wind_speed_10m_next","LMM FIRS miesiac","is_day_z",-0.0795517802177354
+"wind_speed_10m_next","LMM FIRS miesiac","sin_dzien_z",-0.0685664118827445
+"wind_speed_10m_next","LMM FIRS miesiac","cos_dzien_z",-0.0826525710778
+"wind_speed_10m_next","LMM FIRS miesiac","sin_godzina_z",0.173654446078947
+"wind_speed_10m_next","LMM FIRS miesiac","cos_godzina_z",-0.156020484888509
+"wind_speed_10m_next","LMM FIRS miesiac","polrocze_cieple_z",-0.0118182175275518

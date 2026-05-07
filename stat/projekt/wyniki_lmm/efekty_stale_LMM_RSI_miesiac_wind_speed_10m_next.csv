@@ -1,0 +1,21 @@
+"target","model","parametr","estimate"
+"wind_speed_10m_next","LMM RSI miesiac","(Intercept)",18.456766723554
+"wind_speed_10m_next","LMM RSI miesiac","wind_speed_10m_z",8.77715203002765
+"wind_speed_10m_next","LMM RSI miesiac","wind_speed_100m_z",0.809149140025157
+"wind_speed_10m_next","LMM RSI miesiac","wind_gusts_10m_z",-0.986467205601916
+"wind_speed_10m_next","LMM RSI miesiac","wind_dir_sin_z",0.0491678539313333
+"wind_speed_10m_next","LMM RSI miesiac","wind_dir_cos_z",-0.0646427024103919
+"wind_speed_10m_next","LMM RSI miesiac","temperature_2m_z",-0.400609067026894
+"wind_speed_10m_next","LMM RSI miesiac","relative_humidity_2m_z",0.216881404809851
+"wind_speed_10m_next","LMM RSI miesiac","dew_point_2m_z",-0.62753519878502
+"wind_speed_10m_next","LMM RSI miesiac","apparent_temperature_z",0.941929967068129
+"wind_speed_10m_next","LMM RSI miesiac","precipitation_z",0.0669385434822952
+"wind_speed_10m_next","LMM RSI miesiac","cloud_cover_z",0.0820374855692919
+"wind_speed_10m_next","LMM RSI miesiac","pressure_msl_z",-0.0414415792123289
+"wind_speed_10m_next","LMM RSI miesiac","shortwave_radiation_z",0.236391931330734
+"wind_speed_10m_next","LMM RSI miesiac","is_day_z",-0.0795517800621057
+"wind_speed_10m_next","LMM RSI miesiac","sin_dzien_z",-0.0685664152627061
+"wind_speed_10m_next","LMM RSI miesiac","cos_dzien_z",-0.0826525743220004
+"wind_speed_10m_next","LMM RSI miesiac","sin_godzina_z",0.173654445334267
+"wind_speed_10m_next","LMM RSI miesiac","cos_godzina_z",-0.15602048534146
+"wind_speed_10m_next","LMM RSI miesiac","polrocze_cieple_z",-0.0118182171942244

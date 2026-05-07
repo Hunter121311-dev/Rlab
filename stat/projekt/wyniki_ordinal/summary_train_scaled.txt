@@ -1,0 +1,24 @@
+      data               datetime                     warunki_poziom_next wind_speed_10m    wind_speed_100m    wind_gusts_10m     wind_dir_sin    
+ Min.   :1998-11-07   Min.   :1998-11-08 00:00:00   Zle         :125904   Min.   :-2.1253   Min.   :-2.20734   Min.   :-2.1695   Min.   :-1.0680  
+ 1st Qu.:2005-05-22   1st Qu.:2005-05-22 18:30:00   Umiarkowane : 21727   1st Qu.:-0.7453   1st Qu.:-0.71417   1st Qu.:-0.7308   1st Qu.:-0.9686  
+ Median :2011-12-05   Median :2011-12-05 12:00:00   Dobre       : 72049   Median :-0.1128   Median :-0.07195   Median :-0.1272   Median :-0.3437  
+ Mean   :2011-12-04   Mean   :2011-12-05 11:36:21   Bardzo_dobre:  9519   Mean   : 0.0000   Mean   : 0.00000   Mean   : 0.0000   Mean   : 0.0000  
+ 3rd Qu.:2018-06-19   3rd Qu.:2018-06-19 06:30:00                         3rd Qu.: 0.6002   3rd Qu.: 0.61041   3rd Qu.: 0.5816   3rd Qu.: 1.0005  
+ Max.   :2024-12-31   Max.   :2025-01-01 00:00:00                         Max.   : 6.0741   Max.   : 5.99706   Max.   : 7.0032   Max.   : 1.6626  
+                                                                                                                                                  
+  wind_dir_cos      temperature_2m     relative_humidity_2m  dew_point_2m      apparent_temperature precipitation      cloud_cover       pressure_msl     
+ Min.   :-1.37920   Min.   :-3.30045   Min.   :-5.2340      Min.   :-3.43918   Min.   :-2.95622     Min.   :-0.2543   Min.   :-1.8017   Min.   :-5.02859  
+ 1st Qu.:-0.91592   1st Qu.:-0.78678   1st Qu.:-0.6019      1st Qu.:-0.71712   1st Qu.:-0.80433     1st Qu.:-0.2543   1st Qu.:-0.8788   1st Qu.:-0.60009  
+ Median :-0.09927   Median :-0.04907   Median : 0.2155      Median :-0.02213   Median :-0.08339     Median :-0.2543   Median : 0.4784   Median : 0.03399  
+ Mean   : 0.00000   Mean   : 0.00000   Mean   : 0.0000      Mean   : 0.00000   Mean   : 0.00000     Mean   : 0.0000   Mean   : 0.0000   Mean   : 0.00000  
+ 3rd Qu.: 0.79506   3rd Qu.: 0.82525   3rd Qu.: 0.7605      3rd Qu.: 0.81766   3rd Qu.: 0.81232     3rd Qu.:-0.2543   3rd Qu.: 0.9127   3rd Qu.: 0.64795  
+ Max.   : 1.78427   Max.   : 3.42089   Max.   : 1.8504      Max.   : 2.93160   Max.   : 3.17176     Max.   :78.9528   Max.   : 0.9127   Max.   : 3.51641  
+                                                                                                                                                          
+ shortwave_radiation  weather_code       is_day          sin_dzien          cos_dzien          sin_godzina          cos_godzina            polrocze     
+ Min.   :-0.6426     3      :88848   Min.   :-1.0216   Min.   :-1.41338   Min.   :-1.419441   Min.   :-1.414e+00   Min.   :-1.4141147   chlodne:115007  
+ 1st Qu.:-0.6426     0      :41690   1st Qu.:-1.0216   1st Qu.:-0.99622   1st Qu.:-1.008204   1st Qu.:-9.999e-01   1st Qu.:-0.9998912   cieple :114192  
+ Median :-0.6176     1      :29984   Median : 0.9789   Median :-0.00865   Median :-0.001865   Median : 8.021e-05   Median : 0.0001328                   
+ Mean   : 0.0000     2      :28275   Mean   : 0.0000   Mean   : 0.00000   Mean   : 0.000000   Mean   : 0.000e+00   Mean   : 0.0000000                   
+ 3rd Qu.: 0.3180     51     :22235   3rd Qu.: 0.9789   3rd Qu.: 1.00331   3rd Qu.: 1.000860   3rd Qu.: 1.000e+00   3rd Qu.: 1.0001568                   
+ Max.   : 3.7499     71     : 5962   Max.   : 0.9789   Max.   : 1.42047   Max.   : 1.403614   Max.   : 1.414e+00   Max.   : 1.4143803                   
+                     (Other):12205                                                                                                                      

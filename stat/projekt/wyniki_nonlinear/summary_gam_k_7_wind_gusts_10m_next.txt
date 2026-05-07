@@ -1,0 +1,44 @@
+
+Family: gaussian 
+Link function: identity 
+
+Formula:
+wind_gusts_10m_next ~ s(wind_speed_10m, k = 7) + s(wind_speed_100m, 
+    k = 7) + s(wind_gusts_10m, k = 7) + wind_dir_sin + wind_dir_cos + 
+    temperature_2m + relative_humidity_2m + dew_point_2m + apparent_temperature + 
+    precipitation + cloud_cover + pressure_msl + shortwave_radiation + 
+    is_day + sin_dzien + cos_dzien + sin_godzina + cos_godzina + 
+    polrocze_cieple
+
+Parametric coefficients:
+                       Estimate Std. Error t value Pr(>|t|)    
+(Intercept)           5.930e+01  6.950e-01  85.320  < 2e-16 ***
+wind_dir_sin          1.616e-02  7.465e-03   2.165  0.03040 *  
+wind_dir_cos         -1.017e-01  8.954e-03 -11.363  < 2e-16 ***
+temperature_2m        4.784e-02  2.090e-02   2.289  0.02208 *  
+relative_humidity_2m  5.050e-02  3.625e-03  13.931  < 2e-16 ***
+dew_point_2m         -2.836e-01  1.858e-02 -15.261  < 2e-16 ***
+apparent_temperature  1.542e-01  1.362e-02  11.325  < 2e-16 ***
+precipitation         6.918e-01  1.790e-02  38.646  < 2e-16 ***
+cloud_cover           7.189e-03  1.588e-04  45.274  < 2e-16 ***
+pressure_msl         -7.096e-03  5.810e-04 -12.213  < 2e-16 ***
+shortwave_radiation   4.974e-03  5.593e-05  88.921  < 2e-16 ***
+is_day               -1.007e-01  2.028e-02  -4.968 6.78e-07 ***
+sin_dzien            -2.706e-01  1.163e-02 -23.278  < 2e-16 ***
+cos_dzien            -3.649e-01  2.347e-02 -15.552  < 2e-16 ***
+sin_godzina           7.479e-01  7.579e-03  98.692  < 2e-16 ***
+cos_godzina          -4.501e-01  1.674e-02 -26.884  < 2e-16 ***
+polrocze_cieple      -7.248e-02  2.335e-02  -3.104  0.00191 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Approximate significance of smooth terms:
+                     edf Ref.df     F p-value    
+s(wind_speed_10m)  5.128  5.479  2724  <2e-16 ***
+s(wind_speed_100m) 5.786  5.899   746  <2e-16 ***
+s(wind_gusts_10m)  5.109  5.588 18528  <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+R-sq.(adj) =  0.971   Deviance explained = 97.1%
+fREML = 5.2781e+05  Scale est. = 5.8526    n = 229199

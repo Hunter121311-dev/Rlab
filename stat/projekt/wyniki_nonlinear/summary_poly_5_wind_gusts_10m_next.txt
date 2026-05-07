@@ -1,0 +1,49 @@
+
+Call:
+lm(formula = formula_poly, data = train_data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-18.434  -1.418  -0.232   1.114  61.174 
+
+Coefficients:
+                            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                3.431e+01  6.945e-01  49.403  < 2e-16 ***
+poly(wind_speed_10m, 5)1   2.228e+03  1.973e+01 112.899  < 2e-16 ***
+poly(wind_speed_10m, 5)2  -2.493e+02  1.238e+01 -20.147  < 2e-16 ***
+poly(wind_speed_10m, 5)3  -6.637e+00  1.156e+01  -0.574  0.56581    
+poly(wind_speed_10m, 5)4   6.692e+01  1.088e+01   6.152 7.65e-10 ***
+poly(wind_speed_10m, 5)5  -2.122e+00  8.053e+00  -0.264  0.79213    
+poly(wind_speed_100m, 5)1  9.450e+02  1.652e+01  57.202  < 2e-16 ***
+poly(wind_speed_100m, 5)2  4.170e+02  1.062e+01  39.252  < 2e-16 ***
+poly(wind_speed_100m, 5)3 -5.362e+01  1.027e+01  -5.220 1.79e-07 ***
+poly(wind_speed_100m, 5)4 -3.500e+00  9.967e+00  -0.351  0.72544    
+poly(wind_speed_100m, 5)5 -2.701e+01  7.585e+00  -3.560  0.00037 ***
+poly(wind_gusts_10m, 5)1   3.648e+03  1.165e+01 313.082  < 2e-16 ***
+poly(wind_gusts_10m, 5)2  -5.018e+00  7.188e+00  -0.698  0.48512    
+poly(wind_gusts_10m, 5)3  -6.529e+00  5.645e+00  -1.157  0.24745    
+poly(wind_gusts_10m, 5)4  -2.458e+01  4.440e+00  -5.537 3.08e-08 ***
+poly(wind_gusts_10m, 5)5   3.414e+01  3.642e+00   9.374  < 2e-16 ***
+wind_dir_sin               1.482e-02  7.462e-03   1.986  0.04704 *  
+wind_dir_cos              -1.017e-01  8.954e-03 -11.356  < 2e-16 ***
+temperature_2m             4.853e-02  2.089e-02   2.323  0.02020 *  
+relative_humidity_2m       5.096e-02  3.623e-03  14.065  < 2e-16 ***
+dew_point_2m              -2.857e-01  1.857e-02 -15.384  < 2e-16 ***
+apparent_temperature       1.555e-01  1.361e-02  11.427  < 2e-16 ***
+precipitation              6.938e-01  1.789e-02  38.773  < 2e-16 ***
+cloud_cover                7.173e-03  1.587e-04  45.185  < 2e-16 ***
+pressure_msl              -7.067e-03  5.807e-04 -12.169  < 2e-16 ***
+shortwave_radiation        4.971e-03  5.594e-05  88.867  < 2e-16 ***
+is_day                    -1.023e-01  2.027e-02  -5.047 4.49e-07 ***
+sin_dzien                 -2.689e-01  1.163e-02 -23.131  < 2e-16 ***
+cos_dzien                 -3.642e-01  2.345e-02 -15.531  < 2e-16 ***
+sin_godzina                7.467e-01  7.578e-03  98.530  < 2e-16 ***
+cos_godzina               -4.493e-01  1.674e-02 -26.848  < 2e-16 ***
+polrocze_cieple           -7.196e-02  2.334e-02  -3.083  0.00205 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 2.418 on 229167 degrees of freedom
+Multiple R-squared:  0.9712,	Adjusted R-squared:  0.9712 
+F-statistic: 2.493e+05 on 31 and 229167 DF,  p-value: < 2.2e-16
+

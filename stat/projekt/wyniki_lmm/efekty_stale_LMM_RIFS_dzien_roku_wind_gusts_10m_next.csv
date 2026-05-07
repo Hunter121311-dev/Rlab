@@ -1,0 +1,21 @@
+"target","model","parametr","estimate"
+"wind_gusts_10m_next","LMM RIFS dzien_roku","(Intercept)",32.0123950318726
+"wind_gusts_10m_next","LMM RIFS dzien_roku","wind_speed_10m_z",5.11706404762874
+"wind_gusts_10m_next","LMM RIFS dzien_roku","wind_speed_100m_z",1.1432796484391
+"wind_gusts_10m_next","LMM RIFS dzien_roku","wind_gusts_10m_z",8.02945777928949
+"wind_gusts_10m_next","LMM RIFS dzien_roku","wind_dir_sin_z",-0.00295813929269211
+"wind_gusts_10m_next","LMM RIFS dzien_roku","wind_dir_cos_z",-0.067656121330797
+"wind_gusts_10m_next","LMM RIFS dzien_roku","temperature_2m_z",-0.093907845363804
+"wind_gusts_10m_next","LMM RIFS dzien_roku","relative_humidity_2m_z",0.45339001771904
+"wind_gusts_10m_next","LMM RIFS dzien_roku","dew_point_2m_z",-1.64304991786036
+"wind_gusts_10m_next","LMM RIFS dzien_roku","apparent_temperature_z",1.75893305973341
+"wind_gusts_10m_next","LMM RIFS dzien_roku","precipitation_z",0.209265846039629
+"wind_gusts_10m_next","LMM RIFS dzien_roku","cloud_cover_z",0.23514407122434
+"wind_gusts_10m_next","LMM RIFS dzien_roku","pressure_msl_z",-0.100216178776943
+"wind_gusts_10m_next","LMM RIFS dzien_roku","shortwave_radiation_z",0.885840074132354
+"wind_gusts_10m_next","LMM RIFS dzien_roku","is_day_z",-0.077819417632649
+"wind_gusts_10m_next","LMM RIFS dzien_roku","sin_dzien_z",-0.0655641762315077
+"wind_gusts_10m_next","LMM RIFS dzien_roku","cos_dzien_z",-0.0635493516624881
+"wind_gusts_10m_next","LMM RIFS dzien_roku","sin_godzina_z",0.552442019404944
+"wind_gusts_10m_next","LMM RIFS dzien_roku","cos_godzina_z",-0.302707395080248
+"wind_gusts_10m_next","LMM RIFS dzien_roku","polrocze_cieple_z",-0.0316081500146349

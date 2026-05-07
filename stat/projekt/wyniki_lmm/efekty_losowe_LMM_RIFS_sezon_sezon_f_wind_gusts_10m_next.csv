@@ -1,0 +1,5 @@
+"poziom","X.Intercept.","target","model","grupa"
+"zima",-0.00100885489355331,"wind_gusts_10m_next","LMM RIFS sezon","sezon_f"
+"wiosna",0.00171435486313155,"wind_gusts_10m_next","LMM RIFS sezon","sezon_f"
+"lato",-0.00221798264990236,"wind_gusts_10m_next","LMM RIFS sezon","sezon_f"
+"jesien",0.00151248266711778,"wind_gusts_10m_next","LMM RIFS sezon","sezon_f"

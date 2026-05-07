@@ -1,0 +1,21 @@
+Linear mixed model fit by maximum likelihood  ['lmerMod']
+Formula: wind_speed_10m_next ~ 1 + (1 | dzien_roku_f)
+   Data: train_data
+Control: control_lmer
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+1620128.5 1620159.6 -810061.3 1620122.5    229196 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-2.9260 -0.7176 -0.0887  0.6120  5.9008 
+
+Random effects:
+ Groups       Name        Variance Std.Dev.
+ dzien_roku_f (Intercept)  7.326   2.707   
+ Residual                 68.307   8.265   
+Number of obs: 229199, groups:  dzien_roku_f, 366
+
+Fixed effects:
+            Estimate Std. Error t value
+(Intercept)  18.4757     0.1425   129.6

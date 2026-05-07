@@ -1,0 +1,3 @@
+"target","wariant","liczba_zmiennych","validation_MSE","prog","zmienne"
+"wind_gusts_10m_next","minimum",17,5.99910162802506,5.99910162802506,"wind_speed_10m, wind_speed_100m, wind_gusts_10m, wind_dir_cos, relative_humidity_2m, dew_point_2m, apparent_temperature, precipitation, cloud_cover, pressure_msl, shortwave_radiation, is_day, sin_dzien, cos_dzien, sin_godzina, cos_godzina, polrocze_cieple"
+"wind_gusts_10m_next","1pct",7,6.05474353596557,6.05909264430531,"wind_speed_10m, wind_speed_100m, wind_gusts_10m, precipitation, cloud_cover, shortwave_radiation, sin_godzina"

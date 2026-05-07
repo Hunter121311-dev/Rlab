@@ -1,0 +1,66 @@
+Generalized linear mixed model fit by maximum likelihood (Adaptive Gauss-Hermite Quadrature, nAGQ = 0) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: wind_gusts_10m_next_event ~ wind_speed_10m_z + wind_speed_100m_z +      wind_gusts_10m_z + wind_dir_sin_z + wind_dir_cos_z + temperature_2m_z +  
+    relative_humidity_2m_z + dew_point_2m_z + apparent_temperature_z +      precipitation_z + cloud_cover_z + pressure_msl_z + shortwave_radiation_z +  
+    is_day_z + sin_dzien_z + cos_dzien_z + sin_godzina_z + cos_godzina_z +      polrocze_cieple_z + (0 + wind_gusts_10m_z | miesiac_f)
+   Data: train_data
+Control: control_glmer
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+  28754.8   28971.9  -14356.4   28712.8    229178 
+
+Scaled residuals: 
+   Min     1Q Median     3Q    Max 
+   -40      0      0      0  64449 
+
+Random effects:
+ Groups    Name             Variance  Std.Dev.
+ miesiac_f wind_gusts_10m_z 0.0002066 0.01437 
+Number of obs: 229199, groups:  miesiac_f, 12
+
+Fixed effects:
+                         Estimate Std. Error  z value Pr(>|z|)    
+(Intercept)            -10.342668   0.085663 -120.737  < 2e-16 ***
+wind_speed_10m_z         3.036273   0.133725   22.705  < 2e-16 ***
+wind_speed_100m_z        1.769734   0.113519   15.590  < 2e-16 ***
+wind_gusts_10m_z         5.715545   0.083149   68.739  < 2e-16 ***
+wind_dir_sin_z          -0.009702   0.017344   -0.559 0.575889    
+wind_dir_cos_z          -0.019183   0.018975   -1.011 0.312030    
+temperature_2m_z        -0.481868   0.487342   -0.989 0.322777    
+relative_humidity_2m_z   0.410076   0.110654    3.706 0.000211 ***
+dew_point_2m_z          -1.761250   0.347495   -5.068 4.01e-07 ***
+apparent_temperature_z   2.229961   0.459720    4.851 1.23e-06 ***
+precipitation_z          0.174904   0.015660   11.169  < 2e-16 ***
+cloud_cover_z            0.195972   0.019548   10.025  < 2e-16 ***
+pressure_msl_z          -0.058310   0.016390   -3.558 0.000374 ***
+shortwave_radiation_z    0.531071   0.033967   15.635  < 2e-16 ***
+is_day_z                 0.024632   0.031823    0.774 0.438917    
+sin_dzien_z             -0.087573   0.025483   -3.437 0.000589 ***
+cos_dzien_z             -0.186144   0.050620   -3.677 0.000236 ***
+sin_godzina_z            0.391752   0.016441   23.827  < 2e-16 ***
+cos_godzina_z           -0.217073   0.034495   -6.293 3.12e-10 ***
+polrocze_cieple_z       -0.034096   0.036023   -0.947 0.343883    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) wnd_s_10_ w__100 wnd_g_10_ wnd_dr_s_ wnd_dr_c_ tmp_2_ rl__2_ dw__2_ appr__ prcpt_ cld_c_ prss__ shrt__ is_dy_ sn_dz_ cs_dz_ sn_gd_ cs_gd_
+wnd_spd_10_ -0.191                                                                                                                                          
+wnd_sp_100_ -0.134 -0.676                                                                                                                                   
+wnd_gst_10_ -0.546 -0.161    -0.065                                                                                                                         
+wnd_dr_sn_z -0.002 -0.145     0.067  0.052                                                                                                                  
+wnd_dr_cs_z  0.030 -0.189     0.295 -0.131     0.121                                                                                                        
+tmprtr_2m_z  0.007 -0.336     0.016 -0.050     0.151     0.040                                                                                              
+rltv_hmd_2_ -0.016 -0.024     0.081  0.024     0.028     0.045     0.645                                                                                    
+dw_pnt_2m_z  0.028 -0.077    -0.085 -0.010     0.045    -0.058    -0.497 -0.965                                                                             
+apprnt_tmp_ -0.028  0.479    -0.001  0.065    -0.191     0.003    -0.722  0.041 -0.236                                                                      
+precipttn_z -0.094  0.049     0.000 -0.070    -0.118    -0.069    -0.022 -0.141  0.111 -0.063                                                               
+cloud_cvr_z -0.093 -0.123     0.213 -0.046    -0.071     0.137    -0.034 -0.100  0.059 -0.019 -0.072                                                        
+prssr_msl_z  0.008 -0.029    -0.006  0.082    -0.113    -0.220     0.028  0.026  0.000 -0.024  0.146  0.055                                                 
+shrtwv_rdt_ -0.156 -0.350     0.475 -0.103     0.053     0.092     0.102 -0.031  0.112 -0.243  0.102  0.248 -0.046                                          
+is_day_z    -0.002 -0.004     0.083 -0.034    -0.006     0.017    -0.047  0.025 -0.040  0.081  0.022  0.050 -0.013  0.126                                   
+sin_dzien_z  0.029  0.440    -0.528  0.027     0.033    -0.133    -0.161 -0.214  0.187  0.103  0.045 -0.112  0.077 -0.435 -0.102                            
+cos_dzien_z  0.019  0.299    -0.328 -0.015     0.041     0.037    -0.188 -0.227  0.193  0.115  0.100 -0.047  0.023 -0.043  0.186  0.426                     
+sin_godzn_z -0.206  0.021    -0.015  0.186     0.013     0.039    -0.006 -0.056  0.031 -0.006  0.071  0.014  0.030  0.001 -0.059  0.084  0.087              
+cos_godzn_z  0.054  0.027    -0.067 -0.013    -0.003    -0.028    -0.038 -0.059  0.067 -0.008  0.063  0.109  0.002  0.388  0.768 -0.058  0.268 -0.015       
+plrcz_cpl_z  0.008  0.007    -0.020  0.009     0.018    -0.034    -0.021 -0.033  0.038 -0.007  0.004 -0.007  0.020 -0.012  0.014  0.010  0.629 -0.004  0.008

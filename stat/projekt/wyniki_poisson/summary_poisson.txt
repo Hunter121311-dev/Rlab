@@ -1,0 +1,32 @@
+
+Call:
+glm(formula = formula_full, family = poisson, data = dane_dzienne)
+
+Coefficients:
+                    Estimate Std. Error z value Pr(>|z|)    
+(Intercept)       -3.241e-01  4.873e-01  -0.665 0.505978    
+mean_wind_10m      7.106e-02  4.894e-03  14.521  < 2e-16 ***
+max_wind_10m      -3.221e-02  2.467e-03 -13.056  < 2e-16 ***
+mean_gusts_10m    -8.794e-02  2.783e-03 -31.602  < 2e-16 ***
+max_gusts_10m      1.517e-02  1.522e-03   9.967  < 2e-16 ***
+mean_wind_100m     6.781e-02  2.388e-03  28.393  < 2e-16 ***
+mean_temp         -1.888e-02  1.462e-03 -12.916  < 2e-16 ***
+mean_humidity     -5.259e-03  5.141e-04 -10.230  < 2e-16 ***
+mean_pressure      1.579e-03  4.513e-04   3.498 0.000469 ***
+sum_precipitation -5.255e-03  1.209e-03  -4.348 1.37e-05 ***
+mean_cloud_cover   1.594e-03  1.855e-04   8.591  < 2e-16 ***
+sum_shortwave     -5.987e-06  4.902e-06  -1.221 0.221975    
+day_hours          9.122e-02  8.261e-03  11.043  < 2e-16 ***
+sin_dzien         -1.144e-01  1.102e-02 -10.383  < 2e-16 ***
+cos_dzien         -2.563e-01  4.360e-02  -5.878 4.16e-09 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for poisson family taken to be 1)
+
+    Null deviance: 34861  on 10000  degrees of freedom
+Residual deviance: 25719  on  9986  degrees of freedom
+AIC: 61661
+
+Number of Fisher Scoring iterations: 5
+
