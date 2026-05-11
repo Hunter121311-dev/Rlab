@@ -1,0 +1,13 @@
+"target","model","zmienna","importance"
+"wind_speed_10m_next_event","Drzewo 1SE","wind_speed_10m",45573.0280945911
+"wind_speed_10m_next_event","Drzewo 1SE","wind_gusts_10m",33638.3786795302
+"wind_speed_10m_next_event","Drzewo 1SE","wind_speed_100m",33576.899700797
+"wind_speed_10m_next_event","Drzewo 1SE","pressure_msl",505.696886091581
+"wind_speed_10m_next_event","Drzewo 1SE","apparent_temperature",15.3487340445147
+"wind_speed_10m_next_event","Drzewo 1SE","temperature_2m",9.96989602527583
+"wind_speed_10m_next_event","Drzewo 1SE","dew_point_2m",5.94110371029489
+"wind_speed_10m_next_event","Drzewo 1SE","shortwave_radiation",2.42911591120775
+"wind_speed_10m_next_event","Drzewo 1SE","cos_godzina",2.10761527590085
+"wind_speed_10m_next_event","Drzewo 1SE","is_day",1.6789477621583
+"wind_speed_10m_next_event","Drzewo 1SE","precipitation",0.178553649474323
+"wind_speed_10m_next_event","Drzewo 1SE","relative_humidity_2m",0.178553649474323

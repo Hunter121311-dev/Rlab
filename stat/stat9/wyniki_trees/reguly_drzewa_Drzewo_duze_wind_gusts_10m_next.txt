@@ -1,0 +1,42 @@
+ wind_gusts_10m_next                                                                                                                              
+                   8 when wind_gusts_10m <   8.5                                                                                                  
+                  11 when wind_gusts_10m is  8.5 to  11.4                                                                                         
+                  13 when wind_gusts_10m is 11.4 to  13.5                                                                                         
+                  14 when wind_gusts_10m is 13.5 to  15.7 & wind_speed_10m <   8.3                                                                
+                  15 when wind_gusts_10m is 15.7 to  19.3 & wind_speed_10m <  10.1         & sin_godzina <  -0.71                                 
+                  16 when wind_gusts_10m is 13.5 to  15.7 & wind_speed_10m >=          8.3                                                        
+                  17 when wind_gusts_10m is 15.7 to  19.3 & wind_speed_10m <  10.1         & sin_godzina >= -0.71 & shortwave_radiation <  121    
+                  18 when wind_gusts_10m is 19.3 to  22.9 & wind_speed_10m <  11.8         & sin_godzina <  -0.71                                 
+                  18 when wind_gusts_10m is 15.7 to  19.3 & wind_speed_10m <  10.1         & sin_godzina >= -0.71 & shortwave_radiation >= 121    
+                  19 when wind_gusts_10m is 15.7 to  19.3 & wind_speed_10m >=         10.1                                                        
+                  20 when wind_gusts_10m is 19.3 to  22.9 & wind_speed_10m <  11.8         & sin_godzina >= -0.71 & shortwave_radiation <  116    
+                  21 when wind_gusts_10m is 19.3 to  21.1 & wind_speed_10m >=         11.8                                                        
+                  22 when wind_gusts_10m is 19.3 to  22.9 & wind_speed_10m <  11.8         & sin_godzina >= -0.71 & shortwave_radiation >= 116    
+                  22 when wind_gusts_10m is 22.9 to  26.1 & wind_speed_10m <  13.8         & sin_godzina <  -0.50                                 
+                  23 when wind_gusts_10m is 22.9 to  26.1 & wind_speed_10m <  13.8         & sin_godzina >= -0.50 & shortwave_radiation <   61    
+                  23 when wind_gusts_10m is 21.1 to  22.9 & wind_speed_10m >=         11.8                                                        
+                  25 when wind_gusts_10m is 26.1 to  29.0 & wind_speed_10m <  15.3         & sin_godzina <  -0.50                                 
+                  25 when wind_gusts_10m is 22.9 to  24.7 & wind_speed_10m >=         13.8                                                        
+                  25 when wind_gusts_10m is 22.9 to  26.1 & wind_speed_10m <  13.8         & sin_godzina >= -0.50 & shortwave_radiation >=  61    
+                  26 when wind_gusts_10m is 24.7 to  26.1 & wind_speed_10m >=         13.8                                                        
+                  27 when wind_gusts_10m is 29.0 to  32.2 & wind_speed_10m <  16.8         & sin_godzina <  -0.71                                 
+                  27 when wind_gusts_10m is 26.1 to  29.0 & wind_speed_10m <  15.3         & sin_godzina >= -0.50                                 
+                  28 when wind_gusts_10m is 29.0 to  32.2 & wind_speed_10m <  16.8         & sin_godzina >= -0.71 & shortwave_radiation <  192    
+                  28 when wind_gusts_10m is 26.1 to  29.0 & wind_speed_10m >=         15.3                                                        
+                  30 when wind_gusts_10m is 32.2 to  35.1 & wind_speed_10m <  18.3         & sin_godzina <  -0.71                                 
+                  30 when wind_gusts_10m is 29.0 to  32.2 & wind_speed_10m <  16.8         & sin_godzina >= -0.71 & shortwave_radiation >= 192    
+                  31 when wind_gusts_10m is 29.0 to  32.2 & wind_speed_10m is 16.8 to 19.9                                                        
+                  32 when wind_gusts_10m is 32.2 to  35.1 & wind_speed_10m <  18.3         & sin_godzina >= -0.71                                 
+                  33 when wind_gusts_10m is 35.1 to  39.1 & wind_speed_10m <  17.4                                                                
+                  33 when wind_gusts_10m is 29.0 to  32.2 & wind_speed_10m >=         19.9                                                        
+                  34 when wind_gusts_10m is 32.2 to  35.1 & wind_speed_10m is 18.3 to 21.7                                                        
+                  35 when wind_gusts_10m is 35.1 to  39.1 & wind_speed_10m is 17.4 to 20.5                        & shortwave_radiation <  304    
+                  35 when wind_gusts_10m is 32.2 to  35.1 & wind_speed_10m >=         21.7                                                        
+                  37 when wind_gusts_10m is 39.1 to  43.0 & wind_speed_10m <  20.1                                                                
+                  37 when wind_gusts_10m is 35.1 to  39.1 & wind_speed_10m is 17.4 to 20.5                        & shortwave_radiation >= 304    
+                  37 when wind_gusts_10m is 35.1 to  37.3 & wind_speed_10m >=         20.5                                                        
+                  39 when wind_gusts_10m is 37.3 to  39.1 & wind_speed_10m >=         20.5                                                        
+                  39 when wind_gusts_10m is 39.1 to  43.0 & wind_speed_10m is 20.1 to 22.9                                                        
+                  40 when wind_gusts_10m is 43.0 to  47.4 & wind_speed_10m <  22.4                                                                
+                  41 when wind_gusts_10m is 39.1 to  40.9 & wind_speed_10m >=         22.9                                                        
+ [ reached 'max' / getOption("max.print") -- omitted 24 rows ]

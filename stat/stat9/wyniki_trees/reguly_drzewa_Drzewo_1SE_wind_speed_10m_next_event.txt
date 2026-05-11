@@ -1,0 +1,6 @@
+ wind_speed_10m_next_event                                                       
+                      0.02 when wind_speed_10m <  28                             
+                      0.45 when wind_speed_10m is 28 to 28 & wind_gusts_10m >= 46
+                      0.62 when wind_speed_10m is 28 to 28 & wind_gusts_10m <  46
+                      0.71 when wind_speed_10m is 28 to 29                       
+                      0.97 when wind_speed_10m >=       29                       

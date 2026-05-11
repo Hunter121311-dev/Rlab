@@ -1,0 +1,17 @@
+"target","model","zmienna","importance"
+"wind_speed_10m_next","Drzewo duze","wind_speed_10m",16547681.3363274
+"wind_speed_10m_next","Drzewo duze","wind_gusts_10m",12717363.840278
+"wind_speed_10m_next","Drzewo duze","wind_speed_100m",12412410.5012005
+"wind_speed_10m_next","Drzewo duze","pressure_msl",925332.767761473
+"wind_speed_10m_next","Drzewo duze","wind_dir_sin",547299.144013339
+"wind_speed_10m_next","Drzewo duze","cos_dzien",454643.382531861
+"wind_speed_10m_next","Drzewo duze","relative_humidity_2m",149525.563901186
+"wind_speed_10m_next","Drzewo duze","apparent_temperature",72114.8494071266
+"wind_speed_10m_next","Drzewo duze","wind_dir_cos",45193.6081759072
+"wind_speed_10m_next","Drzewo duze","precipitation",2404.93880459441
+"wind_speed_10m_next","Drzewo duze","polrocze_cieple",1251.50888233353
+"wind_speed_10m_next","Drzewo duze","dew_point_2m",830.976461094761
+"wind_speed_10m_next","Drzewo duze","temperature_2m",430.707344662923
+"wind_speed_10m_next","Drzewo duze","cloud_cover",193.852806567856
+"wind_speed_10m_next","Drzewo duze","shortwave_radiation",57.8185493137079
+"wind_speed_10m_next","Drzewo duze","sin_dzien",9.94754995488422

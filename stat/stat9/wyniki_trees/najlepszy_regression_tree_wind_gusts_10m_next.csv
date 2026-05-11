@@ -1,0 +1,2 @@
+"target","model","wariant","CP","liczba_lisci","glebokosc","MSE_train","RMSE_train","MAE_train","R2_train","MSE_test","RMSE_test","MAE_test","R2_test"
+"wind_gusts_10m_next","Drzewo duze","nieprzyciete","1e-04",64,7,7.45388567916519,2.73018052135114,1.96515712945103,0.963286584444269,9.97522186931188,3.15835746382702,2.24690067572342,0.9407854031014

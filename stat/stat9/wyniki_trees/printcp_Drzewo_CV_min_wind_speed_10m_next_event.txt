@@ -1,0 +1,28 @@
+
+Classification tree:
+rpart(formula = formula_tree, data = train_data, method = "class", 
+    parms = list(split = "gini"), control = rpart.control(cp = 1e-04, 
+        minsplit = 100, minbucket = 50, maxdepth = 10, xval = 10))
+
+Variables actually used in tree construction:
+ [1] cos_dzien           is_day              precipitation       pressure_msl        shortwave_radiation
+ [6] sin_dzien           sin_godzina         temperature_2m      wind_dir_cos        wind_dir_sin       
+[11] wind_gusts_10m      wind_speed_100m     wind_speed_10m     
+
+Root node error: 33058/229199 = 0.14423
+
+n= 229199 
+
+           CP nsplit rel error  xerror      xstd
+1  0.80325489      0   1.00000 1.00000 0.0050879
+2  0.00142174      1   0.19675 0.19699 0.0024061
+3  0.00061508      4   0.19248 0.19387 0.0023876
+4  0.00042350      7   0.19063 0.19348 0.0023852
+5  0.00039325     11   0.18894 0.19308 0.0023829
+6  0.00036300     13   0.18815 0.19266 0.0023803
+7  0.00031006     14   0.18779 0.19248 0.0023793
+8  0.00030250     18   0.18655 0.19278 0.0023811
+9  0.00028737     19   0.18625 0.19299 0.0023823
+10 0.00026217     21   0.18567 0.19293 0.0023820
+11 0.00022687     28   0.18365 0.19278 0.0023811
+12 0.00017394     30   0.18319 0.19224 0.0023778

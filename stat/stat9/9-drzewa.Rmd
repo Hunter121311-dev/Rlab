@@ -1,0 +1,267 @@
+---
+title: "Drzewa decyzyjne"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Drzewa decyzyjne są zaimplementowane w pakiecie `rpart` (nieco odmienna
+implementacja dostępna jest w pakiecie `tree`). Dla uzyskania bogatszej
+(i ładniejszej) wizualizacji drzew warto skorzystać z pakietu `rpart.plot`.
+
+```{r}
+library(rpart)
+library(rpart.plot)
+```
+
+### Drzewa klasyfikacyjne
+
+Poniższy kod wykorzystuje zbiór danych `Carseats` z pakietu `ISLR`. Będziemy
+klasyfikować obserwacje do dwóch klas: **wysoka sprzedaż** i **niska sprzedaż**.
+Uzupełniamy zbiór danych o zmienną objaśnianą w zadaniu klasyfikacji.
+
+```{r CarseatsDS}
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+head(CarseatsH)
+```
+
+Budujemy drzewo klasyfikacyjne do predykcji `High` na podstawie pozostałych
+zmiennych (poza `Sales`).
+
+```{r classTree}
+sales_high_rpart <- rpart(High ~ . - Sales, data = CarseatsH)
+plot(sales_high_rpart, margin = 0.1, minbranch = 1.5)
+text(sales_high_rpart, pretty = 0)
+```
+
+Ładniejsze przedstawienie graficzne dopasowanego modelu
+
+```{r}
+rpart.plot(sales_high_rpart)
+```
+
+Drzewo w postaci zbioru reguł
+
+```{r}
+rpart.rules(sales_high_rpart)
+```
+
+Szczegóły struktury drzewa w postaci tekstowej
+
+```{r}
+sales_high_rpart
+```
+
+Podstawowe informacje o modelu łącznie z informacjami dotyczącymi ewentualnego
+przycinania
+
+```{r}
+printcp(sales_high_rpart)
+```
+
+Ważność predyktorów
+
+```{r}
+sales_high_rpart$variable.importance
+```
+
+#### Uwaga
+
+Bardzo szczegółowy raport na temat modelu produkuje funkcja `summary()`.
+Na ogół jest on bardzo długi.
+
+```{r eval=FALSE}
+summary(sales_high_rpart)
+```
+
+#### Estymacja błędu testowego
+
+Metodą zbioru walidacyjnego estymujemy błąd testowy dla drzewa klasyfikacyjnego
+w rozważanym problemie.
+
+```{r}
+set.seed(1)
+n <- nrow(CarseatsH)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+sales_high_big <- rpart(High ~ . - Sales, data = CarseatsH, subset = train)
+sales_high_big_predicted <- predict(sales_high_big, newdata = CarseatsH[test,], type = "class")
+table(sales_high_big_predicted, CarseatsH$High[test])
+mean(sales_high_big_predicted != CarseatsH$High[test])
+```
+
+**Duże** drzewo $T_0$ dla zbioru uczącego `CarseatsH[train,]`
+
+```{r}
+rpart.plot(sales_high_big)
+```
+
+Do znalezienia optymalnego poddrzewa stosujemy przycinanie stosowane złożonością.
+Poniższy wykres pokazuje zależność błędu walidacji krzyżowej od rozmiaru
+poddrzewa (i malejącego parametru złożoności).
+
+```{r}
+plotcp(sales_high_big)
+```
+
+Szczegółowe informacje pokazuje raport tekstowy. Kolumna `xerror` podaje wartości
+względnego błędu CV, a kolumna `CP` zawiera wartość parametru złożoności, który
+wykorzystywany do przycięcia drzewa.
+
+```{r}
+printcp(sales_high_big)
+```
+
+Wyznaczamy parametry drzewa o minimalnym błędzie CV
+
+```{r}
+n_min <- which.min(sales_high_big$cptable[, "xerror"])
+cp_min <- sales_high_big$cptable[n_min, "CP"]
+cp_min
+```
+
+i przycinamy duże drzewo do tego poddrzewa (czyli poddrzewa o 
+`r sales_high_big$cptable[n_min, "nsplit"] + 1` liściach).
+
+```{r}
+sales_high_pruned_min <- prune(sales_high_big, cp = cp_min)
+rpart.plot(sales_high_pruned_min)
+```
+
+Liczymy dla minimalnego poddrzewa błąd walidacyjny
+
+```{r}
+sales_high_pruned_min_predicted <- predict(sales_high_pruned_min, newdata = CarseatsH[test,], type = "class")
+table(sales_high_pruned_min_predicted, CarseatsH$High[test])
+mean(sales_high_pruned_min_predicted != CarseatsH$High[test])
+```
+
+Dla porównania wyznaczamy najmniejsze poddrzewo, którego błąd 
+CV mieści się
+w przedziale jednego błędu standardowego od błędu minimalnego (**reguła 1 SE**)
+
+```{r}
+limit <- sum(sales_high_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(sales_high_big$cptable[, "xerror"] < limit))
+cp_1se <- sales_high_big$cptable[n_1se, "CP"]
+cp_1se
+```
+
+i przycinamy duże drzewo do tego poddrzewa 
+(o `r sales_high_big$cptable[n_1se, "nsplit"] + 1` liściach)
+
+```{r}
+sales_high_pruned_1se <- prune(sales_high_big, cp = cp_1se)
+rpart.plot(sales_high_pruned_1se)
+```
+
+Liczymy dla tego poddrzewa błąd walidacyjny
+
+```{r}
+sales_high_pruned_1se_predicted <- predict(sales_high_pruned_1se, newdata = CarseatsH[test,], type = "class")
+table(sales_high_pruned_1se_predicted, CarseatsH$High[test])
+mean(sales_high_pruned_1se_predicted != CarseatsH$High[test])
+```
+
+### Drzewa regresyjne
+
+Używamy zbioru danych `Boston` z pakietu `MASS`. Konstruujemy drzewo decyzyjne
+dla problemu regresji `medv` względem pozostałych zmiennych.
+
+```{r}
+library(MASS)
+medv_rpart <- rpart(medv ~ ., data = Boston)
+rpart.plot(medv_rpart, digits = 4)
+```
+
+Struktura w postaci tekstowej. *Deviance* oznacza tutaj RSS.
+
+```{r}
+medv_rpart
+```
+
+Podstawowe informacje podsumowujące model.
+
+```{r}
+printcp(medv_rpart)
+```
+
+Ważność predyktorów
+
+```{r}
+medv_rpart$variable.importance
+```
+
+#### Estymacja błędu testowego
+
+Metodą zbioru walidacyjnego szacujemy błąd testowy (MSE).
+
+```{r medvtreeerror}
+set.seed(2025)
+n <- nrow(Boston)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+medv_big <- rpart(medv ~ ., data = Boston, subset = train)
+medv_big_pred <- predict(medv_big, newdata = Boston[test,])
+mean((medv_big_pred - Boston$medv[test])^2)
+```
+
+Struktura dużego drzewa
+
+```{r}
+rpart.plot(medv_big, digits = 4)
+```
+
+Wyznaczamy optymalne poddrzewo metodą przycinania sterowanego złożonością.
+
+```{r medv.tree.cv}
+plotcp(medv_big)
+```
+
+W postaci tekstowej
+
+```{r}
+medv_big$cptable
+```
+
+Optymalne w tym przypadku jest - jak widać - drzewo duże. Według reguły 1 SE
+można je jednak przyciąć do drzewa o 7 liściach.
+
+```{r}
+n_min <- which.min(medv_big$cptable[, "xerror"])
+limit <- sum(medv_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(medv_big$cptable[, "xerror"] < limit))
+cp_1se <- medv_big$cptable[n_1se - 1, "CP"]
+medv_pruned <- prune(medv_big, cp = cp_1se)
+rpart.plot(medv_pruned)
+```
+
+Estymata błędu testowego
+
+```{r}
+medv_pruned_pred <- predict(medv_pruned, newdata = Boston[test,])
+mean((medv_pruned_pred - Boston$medv[test])^2)
+```
+
+### Zadania
+
+1. Porównaj estymaty błędu testowego drzew decyzyjnych dla zbioru `Boston`
+z odpowiednią estymatą uzyskaną dla regresji liniowej.
+
+1. Porównaj estymaty błędu testowego drzew decyzyjnych dla zbioru `CarseatsH`
+z odpowiednimi estymatami uzyskanymi dla regresji logistycznej, LDA i QDA.
+
+1. Czy w poprzednich zadaniach występują predyktory istotne w modelu
+liniowym/logistycznym a nieistotne w modelu drzewa decyzyjnego? A na odwrót?
+
+1. Przeanalizuj przy pomocy drzew decyzyjnych zbiory danych `ISLR::Hitters` 
+i `titanic::titanic_train`. Sprawdź jakość predykcji przy pomocy zbioru
+walidacyjnego (w pierwszym przypadku) i zbioru testowego 
+(czyli `titanic::titanic_test` w drugim przypadku).

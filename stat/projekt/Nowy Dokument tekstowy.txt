@@ -1,0 +1,1559 @@
+# ============================================================
+# DRZEWA DECYZYJNE
+# PREDYKCJA PRĘDKOŚCI WIATRU, PORYWÓW ORAZ KLAS WARUNKÓW WIATROWYCH
+# W NASTĘPNEJ GODZINIE
+# ============================================================
+
+# ------------------------------------------------------------
+# 0. Pakiety i ustawienia
+# ------------------------------------------------------------
+
+library(dplyr)
+library(lubridate)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+
+plot_dir <- "plots_trees"
+results_dir <- "wyniki_trees"
+
+dir.create(plot_dir, showWarnings = FALSE)
+dir.create(results_dir, showWarnings = FALSE)
+
+set.seed(2025)
+
+# ------------------------------------------------------------
+# 0.1. Funkcje pomocnicze
+# ------------------------------------------------------------
+
+bezpieczna_nazwa <- function(x) {
+  x <- gsub("ą", "a", x)
+  x <- gsub("ć", "c", x)
+  x <- gsub("ę", "e", x)
+  x <- gsub("ł", "l", x)
+  x <- gsub("ń", "n", x)
+  x <- gsub("ó", "o", x)
+  x <- gsub("ś", "s", x)
+  x <- gsub("ż", "z", x)
+  x <- gsub("ź", "z", x)
+  x <- gsub("[^A-Za-z0-9]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^_|_$", "", x)
+  x
+}
+
+zapisz_wykres <- function(nazwa, kod) {
+  png(
+    filename = file.path(plot_dir, nazwa),
+    width = 1300,
+    height = 850,
+    res = 140
+  )
+  on.exit(dev.off(), add = TRUE)
+  eval(substitute(kod), envir = parent.frame())
+}
+
+zapisz_gg <- function(nazwa, wykres, szerokosc = 10, wysokosc = 6) {
+  ggsave(
+    filename = file.path(plot_dir, nazwa),
+    plot = wykres,
+    width = szerokosc,
+    height = wysokosc,
+    dpi = 140
+  )
+}
+
+mse <- function(y, y_hat) {
+  mean((y - y_hat)^2, na.rm = TRUE)
+}
+
+rmse <- function(y, y_hat) {
+  sqrt(mse(y, y_hat))
+}
+
+mae <- function(y, y_hat) {
+  mean(abs(y - y_hat), na.rm = TRUE)
+}
+
+r2_test <- function(y, y_hat) {
+  1 - sum((y - y_hat)^2, na.rm = TRUE) /
+    sum((y - mean(y, na.rm = TRUE))^2, na.rm = TRUE)
+}
+
+metryki_regresji <- function(y, y_hat) {
+  data.frame(
+    MSE = mse(y, y_hat),
+    RMSE = rmse(y, y_hat),
+    MAE = mae(y, y_hat),
+    R2 = r2_test(y, y_hat)
+  )
+}
+
+log_loss <- function(y, p) {
+  eps <- 1e-15
+  p <- pmin(pmax(p, eps), 1 - eps)
+  -mean(y * log(p) + (1 - y) * log(1 - p), na.rm = TRUE)
+}
+
+brier_score <- function(y, p) {
+  mean((y - p)^2, na.rm = TRUE)
+}
+
+auc_roc <- function(y, p) {
+  ok <- complete.cases(y, p)
+  y <- y[ok]
+  p <- p[ok]
+  
+  n1 <- sum(y == 1)
+  n0 <- sum(y == 0)
+  
+  if (n1 == 0 || n0 == 0) {
+    return(NA_real_)
+  }
+  
+  r <- rank(p, ties.method = "average")
+  (sum(r[y == 1]) - n1 * (n1 + 1) / 2) / (n1 * n0)
+}
+
+metryki_klasyfikacji <- function(y, p, prog = 0.5) {
+  pred <- ifelse(p >= prog, 1, 0)
+  
+  TP <- sum(pred == 1 & y == 1, na.rm = TRUE)
+  TN <- sum(pred == 0 & y == 0, na.rm = TRUE)
+  FP <- sum(pred == 1 & y == 0, na.rm = TRUE)
+  FN <- sum(pred == 0 & y == 1, na.rm = TRUE)
+  
+  accuracy <- (TP + TN) / (TP + TN + FP + FN)
+  sensitivity <- ifelse((TP + FN) == 0, NA_real_, TP / (TP + FN))
+  specificity <- ifelse((TN + FP) == 0, NA_real_, TN / (TN + FP))
+  precision <- ifelse((TP + FP) == 0, NA_real_, TP / (TP + FP))
+  f1 <- ifelse(
+    is.na(precision) | is.na(sensitivity) | (precision + sensitivity) == 0,
+    NA_real_,
+    2 * precision * sensitivity / (precision + sensitivity)
+  )
+  
+  data.frame(
+    threshold = prog,
+    accuracy = accuracy,
+    sensitivity = sensitivity,
+    specificity = specificity,
+    precision = precision,
+    F1 = f1,
+    TP = TP,
+    TN = TN,
+    FP = FP,
+    FN = FN
+  )
+}
+
+wybierz_prog_youden <- function(y, p) {
+  progi <- seq(0.05, 0.95, by = 0.01)
+  
+  wyniki <- lapply(progi, function(pr) {
+    met <- metryki_klasyfikacji(y, p, prog = pr)
+    data.frame(
+      threshold = pr,
+      youden = met$sensitivity + met$specificity - 1
+    )
+  })
+  
+  wyniki <- do.call(rbind, wyniki)
+  
+  if (all(is.na(wyniki$youden))) {
+    return(0.5)
+  }
+  
+  wyniki$threshold[which.max(wyniki$youden)]
+}
+
+dane_roc <- function(y, p) {
+  ok <- complete.cases(y, p)
+  y <- y[ok]
+  p <- p[ok]
+  
+  tab <- data.frame(y = y, p = p)
+  tab <- tab %>%
+    dplyr::arrange(desc(p))
+  
+  n1 <- sum(tab$y == 1)
+  n0 <- sum(tab$y == 0)
+  
+  if (n1 == 0 || n0 == 0) {
+    return(data.frame(FPR = NA_real_, TPR = NA_real_))
+  }
+  
+  tab$TP <- cumsum(tab$y == 1)
+  tab$FP <- cumsum(tab$y == 0)
+  
+  data.frame(
+    FPR = tab$FP / n0,
+    TPR = tab$TP / n1
+  )
+}
+
+liczba_lisci <- function(fit) {
+  sum(fit$frame$var == "<leaf>")
+}
+
+glebokosc_drzewa <- function(fit) {
+  max(floor(log(as.numeric(rownames(fit$frame)), base = 2)))
+}
+
+pobierz_cp <- function(fit) {
+  cp_tab <- as.data.frame(fit$cptable)
+  
+  n_min <- which.min(cp_tab$xerror)
+  cp_min <- cp_tab$CP[n_min]
+  
+  limit_1se <- cp_tab$xerror[n_min] + cp_tab$xstd[n_min]
+  n_1se <- min(which(cp_tab$xerror <= limit_1se))
+  cp_1se <- cp_tab$CP[n_1se]
+  
+  data.frame(
+    wariant = c("minimum CV", "regula 1SE"),
+    indeks = c(n_min, n_1se),
+    CP = c(cp_min, cp_1se),
+    nsplit = c(cp_tab$nsplit[n_min], cp_tab$nsplit[n_1se]),
+    xerror = c(cp_tab$xerror[n_min], cp_tab$xerror[n_1se]),
+    xstd = c(cp_tab$xstd[n_min], cp_tab$xstd[n_1se]),
+    limit_1se = c(NA_real_, limit_1se)
+  )
+}
+
+zapisz_waznosc <- function(fit, target, model_name, suffix) {
+  imp <- fit$variable.importance
+  
+  if (is.null(imp)) {
+    tab <- data.frame(
+      target = target,
+      model = model_name,
+      zmienna = character(0),
+      importance = numeric(0)
+    )
+  } else {
+    tab <- data.frame(
+      target = target,
+      model = model_name,
+      zmienna = names(imp),
+      importance = as.numeric(imp)
+    )
+    
+    tab <- tab %>%
+      dplyr::arrange(desc(importance))
+  }
+  
+  write.csv(
+    tab,
+    file.path(
+      results_dir,
+      paste0("waznosc_predyktorow_", bezpieczna_nazwa(model_name), "_", suffix, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  if (nrow(tab) > 0) {
+    wykres <- ggplot(
+      tab,
+      aes(x = reorder(zmienna, importance), y = importance)
+    ) +
+      geom_col() +
+      coord_flip() +
+      labs(
+        title = paste("Ważność predyktorów:", target),
+        subtitle = model_name,
+        x = "Predyktor",
+        y = "Ważność"
+      ) +
+      theme_minimal()
+    
+    zapisz_gg(
+      paste0("waznosc_predyktorow_", bezpieczna_nazwa(model_name), "_", suffix, ".png"),
+      wykres,
+      szerokosc = 9,
+      wysokosc = 6
+    )
+  }
+}
+
+zapisz_opis_drzewa <- function(fit, target, model_name, suffix) {
+  capture.output(
+    print(fit),
+    file = file.path(
+      results_dir,
+      paste0("struktura_drzewa_", bezpieczna_nazwa(model_name), "_", suffix, ".txt")
+    )
+  )
+  
+  capture.output(
+    summary(fit),
+    file = file.path(
+      results_dir,
+      paste0("summary_drzewa_", bezpieczna_nazwa(model_name), "_", suffix, ".txt")
+    )
+  )
+  
+  capture.output(
+    printcp(fit),
+    file = file.path(
+      results_dir,
+      paste0("printcp_", bezpieczna_nazwa(model_name), "_", suffix, ".txt")
+    )
+  )
+  
+  tryCatch(
+    capture.output(
+      rpart.rules(fit),
+      file = file.path(
+        results_dir,
+        paste0("reguly_drzewa_", bezpieczna_nazwa(model_name), "_", suffix, ".txt")
+      )
+    ),
+    error = function(e) {
+      writeLines(
+        paste("Nie udało się zapisać reguł:", e$message),
+        con = file.path(
+          results_dir,
+          paste0("reguly_drzewa_", bezpieczna_nazwa(model_name), "_", suffix, ".txt")
+        )
+      )
+    }
+  )
+}
+
+wynik_regresji_drzewa <- function(
+    target,
+    model_name,
+    wariant,
+    fit,
+    cp,
+    y_train,
+    pred_train,
+    y_test,
+    pred_test
+) {
+  met_train <- metryki_regresji(y_train, pred_train)
+  met_test <- metryki_regresji(y_test, pred_test)
+  
+  data.frame(
+    target = target,
+    model = model_name,
+    wariant = wariant,
+    CP = ifelse(is.null(cp), "nie dotyczy", as.character(cp)),
+    liczba_lisci = ifelse(is.null(fit), 0, liczba_lisci(fit)),
+    glebokosc = ifelse(is.null(fit), 0, glebokosc_drzewa(fit)),
+    MSE_train = met_train$MSE,
+    RMSE_train = met_train$RMSE,
+    MAE_train = met_train$MAE,
+    R2_train = met_train$R2,
+    MSE_test = met_test$MSE,
+    RMSE_test = met_test$RMSE,
+    MAE_test = met_test$MAE,
+    R2_test = met_test$R2
+  )
+}
+
+wynik_klasyfikacji_drzewa <- function(
+    target,
+    model_name,
+    wariant,
+    fit,
+    cp,
+    y_train,
+    p_train,
+    y_test,
+    p_test
+) {
+  prog_train <- wybierz_prog_youden(y_train, p_train)
+  
+  met_train <- metryki_klasyfikacji(y_train, p_train, prog = prog_train)
+  met_test <- metryki_klasyfikacji(y_test, p_test, prog = prog_train)
+  
+  data.frame(
+    target = target,
+    model = model_name,
+    wariant = wariant,
+    CP = ifelse(is.null(cp), "nie dotyczy", as.character(cp)),
+    liczba_lisci = ifelse(is.null(fit), 0, liczba_lisci(fit)),
+    glebokosc = ifelse(is.null(fit), 0, glebokosc_drzewa(fit)),
+    prog_decyzyjny = prog_train,
+    
+    AUC_train = auc_roc(y_train, p_train),
+    Brier_train = brier_score(y_train, p_train),
+    LogLoss_train = log_loss(y_train, p_train),
+    Accuracy_train = met_train$accuracy,
+    Sensitivity_train = met_train$sensitivity,
+    Specificity_train = met_train$specificity,
+    Precision_train = met_train$precision,
+    F1_train = met_train$F1,
+    
+    AUC_test = auc_roc(y_test, p_test),
+    Brier_test = brier_score(y_test, p_test),
+    LogLoss_test = log_loss(y_test, p_test),
+    Accuracy_test = met_test$accuracy,
+    Sensitivity_test = met_test$sensitivity,
+    Specificity_test = met_test$specificity,
+    Precision_test = met_test$precision,
+    F1_test = met_test$F1,
+    
+    TP_test = met_test$TP,
+    TN_test = met_test$TN,
+    FP_test = met_test$FP,
+    FN_test = met_test$FN
+  )
+}
+
+# ------------------------------------------------------------
+# 1. Wczytanie i przygotowanie danych
+# ------------------------------------------------------------
+
+dane <- read.csv(
+  "/Users/damia/OneDrive/Dokumenty/Rlab/stat/projekt/data/chalupy_hourly_10000_days.csv"
+)
+
+dane$datetime <- as.POSIXct(
+  dane$datetime,
+  format = "%Y-%m-%dT%H:%M"
+)
+
+dane <- dane %>%
+  dplyr::arrange(datetime)
+
+dane$data <- as.Date(dane$datetime)
+dane$rok <- year(dane$datetime)
+dane$miesiac <- month(dane$datetime)
+dane$dzien_roku <- yday(dane$datetime)
+dane$godzina <- hour(dane$datetime)
+
+# Predykcja dotyczy następnej godziny: t + 1.
+dane$wind_speed_10m_next <- dplyr::lead(dane$wind_speed_10m, 1)
+dane$wind_gusts_10m_next <- dplyr::lead(dane$wind_gusts_10m, 1)
+
+# Sezonowość roczna i dobowa.
+dane$sin_dzien <- sin(2 * pi * dane$dzien_roku / 365)
+dane$cos_dzien <- cos(2 * pi * dane$dzien_roku / 365)
+
+dane$sin_godzina <- sin(2 * pi * dane$godzina / 24)
+dane$cos_godzina <- cos(2 * pi * dane$godzina / 24)
+
+# Kierunek wiatru jako zmienna cykliczna.
+dane$wind_dir_sin <- sin(2 * pi * dane$wind_direction_10m / 360)
+dane$wind_dir_cos <- cos(2 * pi * dane$wind_direction_10m / 360)
+
+# Zmienna sezonowa pomocnicza.
+dane$polrocze_cieple <- ifelse(
+  dane$miesiac %in% c(4, 5, 6, 7, 8, 9),
+  1,
+  0
+)
+
+# ------------------------------------------------------------
+# 2. Definicja zmiennych binarnych dla drzew klasyfikacyjnych
+# ------------------------------------------------------------
+
+wezel_na_kmh <- 1.852
+
+prog_wind_speed_kt <- 15
+prog_wind_gusts_kt <- 25
+
+prog_wind_speed_kmh <- prog_wind_speed_kt * wezel_na_kmh
+prog_wind_gusts_kmh <- prog_wind_gusts_kt * wezel_na_kmh
+
+dane$wind_speed_10m_next_event <- factor(
+  ifelse(dane$wind_speed_10m_next >= prog_wind_speed_kmh, "1", "0"),
+  levels = c("0", "1")
+)
+
+dane$wind_gusts_10m_next_event <- factor(
+  ifelse(dane$wind_gusts_10m_next >= prog_wind_gusts_kmh, "1", "0"),
+  levels = c("0", "1")
+)
+
+opis_progowych_zmiennych <- data.frame(
+  target = c("wind_speed_10m_next_event", "wind_gusts_10m_next_event"),
+  zmienna_ciagla = c("wind_speed_10m_next", "wind_gusts_10m_next"),
+  prog_wezly = c(prog_wind_speed_kt, prog_wind_gusts_kt),
+  prog_kmh = c(prog_wind_speed_kmh, prog_wind_gusts_kmh)
+)
+
+write.csv(
+  opis_progowych_zmiennych,
+  file.path(results_dir, "opis_progowych_zmiennych.csv"),
+  row.names = FALSE
+)
+
+# ------------------------------------------------------------
+# 3. Predyktory i zmienne zależne
+# ------------------------------------------------------------
+
+predyktory <- c(
+  "wind_speed_10m",
+  "wind_speed_100m",
+  "wind_gusts_10m",
+  "wind_dir_sin",
+  "wind_dir_cos",
+  "temperature_2m",
+  "relative_humidity_2m",
+  "dew_point_2m",
+  "apparent_temperature",
+  "precipitation",
+  "cloud_cover",
+  "pressure_msl",
+  "shortwave_radiation",
+  "is_day",
+  "sin_dzien",
+  "cos_dzien",
+  "sin_godzina",
+  "cos_godzina",
+  "polrocze_cieple"
+)
+
+predyktory <- predyktory[predyktory %in% names(dane)]
+
+targety_regresja <- c(
+  "wind_speed_10m_next",
+  "wind_gusts_10m_next"
+)
+
+targety_klasyfikacja <- c(
+  "wind_speed_10m_next_event",
+  "wind_gusts_10m_next_event"
+)
+
+# ------------------------------------------------------------
+# 4. Korelacje predyktorów
+# ------------------------------------------------------------
+
+dane_korelacje <- dane %>%
+  dplyr::select(all_of(predyktory))
+
+dane_korelacje <- dane_korelacje[
+  stats::complete.cases(dane_korelacje),
+  ,
+  drop = FALSE
+]
+
+macierz_korelacji <- cor(dane_korelacje)
+
+write.csv(
+  macierz_korelacji,
+  file.path(results_dir, "macierz_korelacji_predyktorow.csv")
+)
+
+wysokie_korelacje <- data.frame()
+
+for (i in 1:(ncol(macierz_korelacji) - 1)) {
+  for (j in (i + 1):ncol(macierz_korelacji)) {
+    wysokie_korelacje <- rbind(
+      wysokie_korelacje,
+      data.frame(
+        zmienna_1 = colnames(macierz_korelacji)[i],
+        zmienna_2 = colnames(macierz_korelacji)[j],
+        korelacja = macierz_korelacji[i, j],
+        abs_korelacja = abs(macierz_korelacji[i, j])
+      )
+    )
+  }
+}
+
+wysokie_korelacje <- wysokie_korelacje %>%
+  dplyr::arrange(desc(abs_korelacja))
+
+write.csv(
+  wysokie_korelacje,
+  file.path(results_dir, "korelacje_predyktorow_posortowane.csv"),
+  row.names = FALSE
+)
+
+zapisz_wykres("00_macierz_korelacji_predyktorow.png", {
+  par(mar = c(10, 10, 4, 2))
+  
+  image(
+    1:ncol(macierz_korelacji),
+    1:ncol(macierz_korelacji),
+    macierz_korelacji,
+    axes = FALSE,
+    main = "Macierz korelacji predyktorów",
+    xlab = "",
+    ylab = ""
+  )
+  
+  axis(
+    1,
+    at = 1:ncol(macierz_korelacji),
+    labels = colnames(macierz_korelacji),
+    las = 2,
+    cex.axis = 0.55
+  )
+  
+  axis(
+    2,
+    at = 1:ncol(macierz_korelacji),
+    labels = colnames(macierz_korelacji),
+    las = 2,
+    cex.axis = 0.55
+  )
+})
+
+# ------------------------------------------------------------
+# 5. Drzewa regresyjne
+# ------------------------------------------------------------
+
+analizuj_drzewo_regresyjne <- function(target) {
+  
+  cat("\n============================================================\n")
+  cat("Drzewo regresyjne dla zmiennej:", target, "\n")
+  cat("============================================================\n")
+  
+  suffix <- target
+  
+  dane_model <- dane %>%
+    dplyr::select(
+      data,
+      datetime,
+      all_of(target),
+      all_of(predyktory)
+    )
+  
+  dane_model <- dane_model[
+    stats::complete.cases(dane_model),
+    ,
+    drop = FALSE
+  ]
+  
+  train_data <- dane_model %>%
+    dplyr::filter(data < as.Date("2025-01-01"))
+  
+  test_data <- dane_model %>%
+    dplyr::filter(data >= as.Date("2025-01-01"))
+  
+  y_train <- train_data[[target]]
+  y_test <- test_data[[target]]
+  
+  opis_danych <- data.frame(
+    target = target,
+    n_total = nrow(dane_model),
+    n_train = nrow(train_data),
+    n_test = nrow(test_data),
+    mean_train = mean(y_train),
+    mean_test = mean(y_test),
+    sd_train = sd(y_train),
+    sd_test = sd(y_test)
+  )
+  
+  write.csv(
+    opis_danych,
+    file.path(results_dir, paste0("opis_danych_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  formula_tree <- as.formula(
+    paste(target, "~", paste(predyktory, collapse = " + "))
+  )
+  
+  wyniki <- list()
+  predykcje_test <- list()
+  modele <- list()
+  
+  # ----------------------------------------------------------
+  # 5.1. Model zerowy
+  # ----------------------------------------------------------
+  
+  pred_null_train <- rep(mean(y_train), length(y_train))
+  pred_null_test <- rep(mean(y_train), length(y_test))
+  
+  wyniki[["Model zerowy"]] <- wynik_regresji_drzewa(
+    target = target,
+    model_name = "Model zerowy",
+    wariant = "bazowy",
+    fit = NULL,
+    cp = NULL,
+    y_train = y_train,
+    pred_train = pred_null_train,
+    y_test = y_test,
+    pred_test = pred_null_test
+  )
+  
+  predykcje_test[["Model zerowy"]] <- pred_null_test
+  
+  # ----------------------------------------------------------
+  # 5.2. Duże drzewo
+  # ----------------------------------------------------------
+  
+  fit_big <- rpart(
+    formula_tree,
+    data = train_data,
+    method = "anova",
+    control = rpart.control(
+      cp = 0.0001,
+      minsplit = 100,
+      minbucket = 50,
+      maxdepth = 10,
+      xval = 10
+    )
+  )
+  
+  pred_big_train <- predict(fit_big, newdata = train_data)
+  pred_big_test <- predict(fit_big, newdata = test_data)
+  
+  wyniki[["Drzewo duze"]] <- wynik_regresji_drzewa(
+    target = target,
+    model_name = "Drzewo duze",
+    wariant = "nieprzyciete",
+    fit = fit_big,
+    cp = fit_big$control$cp,
+    y_train = y_train,
+    pred_train = pred_big_train,
+    y_test = y_test,
+    pred_test = pred_big_test
+  )
+  
+  modele[["Drzewo duze"]] <- fit_big
+  predykcje_test[["Drzewo duze"]] <- pred_big_test
+  
+  cp_tabela <- as.data.frame(fit_big$cptable)
+  cp_tabela$target <- target
+  
+  write.csv(
+    cp_tabela,
+    file.path(results_dir, paste0("cp_table_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  cp_wybor <- pobierz_cp(fit_big)
+  cp_wybor$target <- target
+  
+  write.csv(
+    cp_wybor,
+    file.path(results_dir, paste0("wybor_cp_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  zapisz_wykres(paste0("01_cp_regression_tree_", suffix, ".png"), {
+    plotcp(fit_big, main = paste("Przycinanie drzewa regresyjnego:", target))
+  })
+  
+  zapisz_wykres(paste0("02_drzewo_duze_regression_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_big,
+      digits = 4,
+      main = paste("Duże drzewo regresyjne:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_big, target, "Drzewo duze", suffix)
+  zapisz_waznosc(fit_big, target, "Drzewo duze", suffix)
+  
+  # ----------------------------------------------------------
+  # 5.3. Drzewo przycięte: minimum CV
+  # ----------------------------------------------------------
+  
+  cp_min <- cp_wybor$CP[cp_wybor$wariant == "minimum CV"]
+  fit_min <- prune(fit_big, cp = cp_min)
+  
+  pred_min_train <- predict(fit_min, newdata = train_data)
+  pred_min_test <- predict(fit_min, newdata = test_data)
+  
+  wyniki[["Drzewo CV min"]] <- wynik_regresji_drzewa(
+    target = target,
+    model_name = "Drzewo CV min",
+    wariant = "przyciete minimum CV",
+    fit = fit_min,
+    cp = cp_min,
+    y_train = y_train,
+    pred_train = pred_min_train,
+    y_test = y_test,
+    pred_test = pred_min_test
+  )
+  
+  modele[["Drzewo CV min"]] <- fit_min
+  predykcje_test[["Drzewo CV min"]] <- pred_min_test
+  
+  zapisz_wykres(paste0("03_drzewo_cv_min_regression_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_min,
+      digits = 4,
+      main = paste("Drzewo regresyjne przycięte według minimum CV:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_min, target, "Drzewo CV min", suffix)
+  zapisz_waznosc(fit_min, target, "Drzewo CV min", suffix)
+  
+  # ----------------------------------------------------------
+  # 5.4. Drzewo przycięte: reguła 1SE
+  # ----------------------------------------------------------
+  
+  cp_1se <- cp_wybor$CP[cp_wybor$wariant == "regula 1SE"]
+  fit_1se <- prune(fit_big, cp = cp_1se)
+  
+  pred_1se_train <- predict(fit_1se, newdata = train_data)
+  pred_1se_test <- predict(fit_1se, newdata = test_data)
+  
+  wyniki[["Drzewo 1SE"]] <- wynik_regresji_drzewa(
+    target = target,
+    model_name = "Drzewo 1SE",
+    wariant = "przyciete regula 1SE",
+    fit = fit_1se,
+    cp = cp_1se,
+    y_train = y_train,
+    pred_train = pred_1se_train,
+    y_test = y_test,
+    pred_test = pred_1se_test
+  )
+  
+  modele[["Drzewo 1SE"]] <- fit_1se
+  predykcje_test[["Drzewo 1SE"]] <- pred_1se_test
+  
+  zapisz_wykres(paste0("04_drzewo_1se_regression_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_1se,
+      digits = 4,
+      main = paste("Drzewo regresyjne przycięte według reguły 1SE:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_1se, target, "Drzewo 1SE", suffix)
+  zapisz_waznosc(fit_1se, target, "Drzewo 1SE", suffix)
+  
+  # ----------------------------------------------------------
+  # 5.5. Porównanie modeli
+  # ----------------------------------------------------------
+  
+  porownanie <- do.call(rbind, wyniki)
+  porownanie <- porownanie %>%
+    dplyr::arrange(MSE_test)
+  
+  rownames(porownanie) <- NULL
+  
+  write.csv(
+    porownanie,
+    file.path(results_dir, paste0("porownanie_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  najlepszy_model <- porownanie[1, , drop = FALSE]
+  
+  write.csv(
+    najlepszy_model,
+    file.path(results_dir, paste0("najlepszy_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  prog_kompromisu <- najlepszy_model$MSE_test[1] * 1.01
+  
+  model_kompromisowy <- porownanie %>%
+    dplyr::filter(MSE_test <= prog_kompromisu) %>%
+    dplyr::arrange(liczba_lisci, MSE_test) %>%
+    dplyr::slice(1)
+  
+  write.csv(
+    model_kompromisowy,
+    file.path(results_dir, paste0("kompromisowy_regression_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  wykres_rmse <- ggplot(
+    porownanie,
+    aes(x = reorder(model, RMSE_test), y = RMSE_test)
+  ) +
+    geom_col() +
+    coord_flip() +
+    labs(
+      title = paste("Porównanie RMSE test dla drzew regresyjnych:", target),
+      x = "Model",
+      y = "RMSE test"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("05_porownanie_RMSE_regression_tree_", suffix, ".png"),
+    wykres_rmse,
+    szerokosc = 9,
+    wysokosc = 5
+  )
+  
+  wykres_r2 <- ggplot(
+    porownanie,
+    aes(x = reorder(model, R2_test), y = R2_test)
+  ) +
+    geom_col() +
+    coord_flip() +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(
+      title = paste("Porównanie R2 test dla drzew regresyjnych:", target),
+      x = "Model",
+      y = "R2 test"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("06_porownanie_R2_regression_tree_", suffix, ".png"),
+    wykres_r2,
+    szerokosc = 9,
+    wysokosc = 5
+  )
+  
+  najlepsza_nazwa <- najlepszy_model$model[1]
+  pred_best_test <- predykcje_test[[najlepsza_nazwa]]
+  
+  zapisz_wykres(paste0("07_rzeczywiste_vs_pred_regression_tree_", suffix, ".png"), {
+    plot(
+      y_test,
+      pred_best_test,
+      main = paste("Najlepsze drzewo regresyjne: rzeczywiste vs przewidywane:", target),
+      xlab = "Wartości rzeczywiste",
+      ylab = "Wartości przewidywane"
+    )
+    abline(0, 1, lwd = 2)
+  })
+  
+  zapisz_wykres(paste0("08_szereg_test_regression_tree_", suffix, ".png"), {
+    n_plot <- min(500, nrow(test_data))
+    
+    plot(
+      test_data$datetime[1:n_plot],
+      y_test[1:n_plot],
+      type = "l",
+      main = paste("Najlepsze drzewo regresyjne: wartości rzeczywiste i przewidywane:", target),
+      xlab = "Czas",
+      ylab = target
+    )
+    
+    lines(
+      test_data$datetime[1:n_plot],
+      pred_best_test[1:n_plot],
+      lty = 2,
+      lwd = 2
+    )
+    
+    legend(
+      "topright",
+      legend = c("Rzeczywiste", "Przewidywane"),
+      lty = c(1, 2),
+      lwd = c(1, 2),
+      bty = "n"
+    )
+  })
+  
+  cat("\n--- Opis danych ---\n")
+  print(opis_danych)
+  
+  cat("\n--- Wybór CP ---\n")
+  print(cp_wybor)
+  
+  cat("\n--- Najlepszy model według MSE test ---\n")
+  print(najlepszy_model)
+  
+  cat("\n--- Model kompromisowy w granicy 1% od najlepszego MSE test ---\n")
+  print(model_kompromisowy)
+  
+  cat("\n--- Porównanie końcowe ---\n")
+  print(porownanie)
+  
+  list(
+    target = target,
+    opis_danych = opis_danych,
+    cp_wybor = cp_wybor,
+    porownanie = porownanie,
+    najlepszy_model = najlepszy_model,
+    model_kompromisowy = model_kompromisowy
+  )
+}
+
+# ------------------------------------------------------------
+# 6. Drzewa klasyfikacyjne
+# ------------------------------------------------------------
+
+analizuj_drzewo_klasyfikacyjne <- function(target) {
+  
+  cat("\n============================================================\n")
+  cat("Drzewo klasyfikacyjne dla zmiennej:", target, "\n")
+  cat("============================================================\n")
+  
+  suffix <- target
+  
+  dane_model <- dane %>%
+    dplyr::select(
+      data,
+      datetime,
+      all_of(target),
+      all_of(predyktory)
+    )
+  
+  dane_model <- dane_model[
+    stats::complete.cases(dane_model),
+    ,
+    drop = FALSE
+  ]
+  
+  train_data <- dane_model %>%
+    dplyr::filter(data < as.Date("2025-01-01"))
+  
+  test_data <- dane_model %>%
+    dplyr::filter(data >= as.Date("2025-01-01"))
+  
+  y_train <- as.integer(as.character(train_data[[target]]))
+  y_test <- as.integer(as.character(test_data[[target]]))
+  
+  opis_danych <- data.frame(
+    target = target,
+    n_total = nrow(dane_model),
+    n_train = nrow(train_data),
+    n_test = nrow(test_data),
+    liczba_klasy_1_train = sum(y_train == 1),
+    liczba_klasy_0_train = sum(y_train == 0),
+    udzial_klasy_1_train = mean(y_train),
+    liczba_klasy_1_test = sum(y_test == 1),
+    liczba_klasy_0_test = sum(y_test == 0),
+    udzial_klasy_1_test = mean(y_test)
+  )
+  
+  write.csv(
+    opis_danych,
+    file.path(results_dir, paste0("opis_danych_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  formula_tree <- as.formula(
+    paste(target, "~", paste(predyktory, collapse = " + "))
+  )
+  
+  wyniki <- list()
+  modele <- list()
+  predykcje_test <- list()
+  predykcje_train <- list()
+  
+  # ----------------------------------------------------------
+  # 6.1. Model zerowy
+  # ----------------------------------------------------------
+  
+  p_null_train <- rep(mean(y_train), length(y_train))
+  p_null_test <- rep(mean(y_train), length(y_test))
+  
+  wyniki[["Model zerowy"]] <- wynik_klasyfikacji_drzewa(
+    target = target,
+    model_name = "Model zerowy",
+    wariant = "bazowy",
+    fit = NULL,
+    cp = NULL,
+    y_train = y_train,
+    p_train = p_null_train,
+    y_test = y_test,
+    p_test = p_null_test
+  )
+  
+  predykcje_train[["Model zerowy"]] <- p_null_train
+  predykcje_test[["Model zerowy"]] <- p_null_test
+  
+  # ----------------------------------------------------------
+  # 6.2. Duże drzewo
+  # ----------------------------------------------------------
+  
+  fit_big <- rpart(
+    formula_tree,
+    data = train_data,
+    method = "class",
+    parms = list(split = "gini"),
+    control = rpart.control(
+      cp = 0.0001,
+      minsplit = 100,
+      minbucket = 50,
+      maxdepth = 10,
+      xval = 10
+    )
+  )
+  
+  p_big_train <- predict(fit_big, newdata = train_data, type = "prob")[, "1"]
+  p_big_test <- predict(fit_big, newdata = test_data, type = "prob")[, "1"]
+  
+  wyniki[["Drzewo duze"]] <- wynik_klasyfikacji_drzewa(
+    target = target,
+    model_name = "Drzewo duze",
+    wariant = "nieprzyciete",
+    fit = fit_big,
+    cp = fit_big$control$cp,
+    y_train = y_train,
+    p_train = p_big_train,
+    y_test = y_test,
+    p_test = p_big_test
+  )
+  
+  modele[["Drzewo duze"]] <- fit_big
+  predykcje_train[["Drzewo duze"]] <- p_big_train
+  predykcje_test[["Drzewo duze"]] <- p_big_test
+  
+  cp_tabela <- as.data.frame(fit_big$cptable)
+  cp_tabela$target <- target
+  
+  write.csv(
+    cp_tabela,
+    file.path(results_dir, paste0("cp_table_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  cp_wybor <- pobierz_cp(fit_big)
+  cp_wybor$target <- target
+  
+  write.csv(
+    cp_wybor,
+    file.path(results_dir, paste0("wybor_cp_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  zapisz_wykres(paste0("01_cp_classification_tree_", suffix, ".png"), {
+    plotcp(fit_big, main = paste("Przycinanie drzewa klasyfikacyjnego:", target))
+  })
+  
+  zapisz_wykres(paste0("02_drzewo_duze_classification_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_big,
+      type = 2,
+      extra = 104,
+      fallen.leaves = TRUE,
+      main = paste("Duże drzewo klasyfikacyjne:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_big, target, "Drzewo duze", suffix)
+  zapisz_waznosc(fit_big, target, "Drzewo duze", suffix)
+  
+  # ----------------------------------------------------------
+  # 6.3. Drzewo przycięte: minimum CV
+  # ----------------------------------------------------------
+  
+  cp_min <- cp_wybor$CP[cp_wybor$wariant == "minimum CV"]
+  fit_min <- prune(fit_big, cp = cp_min)
+  
+  p_min_train <- predict(fit_min, newdata = train_data, type = "prob")[, "1"]
+  p_min_test <- predict(fit_min, newdata = test_data, type = "prob")[, "1"]
+  
+  wyniki[["Drzewo CV min"]] <- wynik_klasyfikacji_drzewa(
+    target = target,
+    model_name = "Drzewo CV min",
+    wariant = "przyciete minimum CV",
+    fit = fit_min,
+    cp = cp_min,
+    y_train = y_train,
+    p_train = p_min_train,
+    y_test = y_test,
+    p_test = p_min_test
+  )
+  
+  modele[["Drzewo CV min"]] <- fit_min
+  predykcje_train[["Drzewo CV min"]] <- p_min_train
+  predykcje_test[["Drzewo CV min"]] <- p_min_test
+  
+  zapisz_wykres(paste0("03_drzewo_cv_min_classification_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_min,
+      type = 2,
+      extra = 104,
+      fallen.leaves = TRUE,
+      main = paste("Drzewo klasyfikacyjne przycięte według minimum CV:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_min, target, "Drzewo CV min", suffix)
+  zapisz_waznosc(fit_min, target, "Drzewo CV min", suffix)
+  
+  # ----------------------------------------------------------
+  # 6.4. Drzewo przycięte: reguła 1SE
+  # ----------------------------------------------------------
+  
+  cp_1se <- cp_wybor$CP[cp_wybor$wariant == "regula 1SE"]
+  fit_1se <- prune(fit_big, cp = cp_1se)
+  
+  p_1se_train <- predict(fit_1se, newdata = train_data, type = "prob")[, "1"]
+  p_1se_test <- predict(fit_1se, newdata = test_data, type = "prob")[, "1"]
+  
+  wyniki[["Drzewo 1SE"]] <- wynik_klasyfikacji_drzewa(
+    target = target,
+    model_name = "Drzewo 1SE",
+    wariant = "przyciete regula 1SE",
+    fit = fit_1se,
+    cp = cp_1se,
+    y_train = y_train,
+    p_train = p_1se_train,
+    y_test = y_test,
+    p_test = p_1se_test
+  )
+  
+  modele[["Drzewo 1SE"]] <- fit_1se
+  predykcje_train[["Drzewo 1SE"]] <- p_1se_train
+  predykcje_test[["Drzewo 1SE"]] <- p_1se_test
+  
+  zapisz_wykres(paste0("04_drzewo_1se_classification_tree_", suffix, ".png"), {
+    rpart.plot(
+      fit_1se,
+      type = 2,
+      extra = 104,
+      fallen.leaves = TRUE,
+      main = paste("Drzewo klasyfikacyjne przycięte według reguły 1SE:", target)
+    )
+  })
+  
+  zapisz_opis_drzewa(fit_1se, target, "Drzewo 1SE", suffix)
+  zapisz_waznosc(fit_1se, target, "Drzewo 1SE", suffix)
+  
+  # ----------------------------------------------------------
+  # 6.5. Porównanie modeli
+  # ----------------------------------------------------------
+  
+  porownanie <- do.call(rbind, wyniki)
+  porownanie <- porownanie %>%
+    dplyr::arrange(desc(AUC_test), Brier_test, LogLoss_test)
+  
+  rownames(porownanie) <- NULL
+  
+  write.csv(
+    porownanie,
+    file.path(results_dir, paste0("porownanie_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  najlepszy_model <- porownanie[1, , drop = FALSE]
+  
+  write.csv(
+    najlepszy_model,
+    file.path(results_dir, paste0("najlepszy_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  prog_kompromisu <- najlepszy_model$AUC_test[1] * 0.99
+  
+  model_kompromisowy <- porownanie %>%
+    dplyr::filter(AUC_test >= prog_kompromisu) %>%
+    dplyr::arrange(liczba_lisci, Brier_test) %>%
+    dplyr::slice(1)
+  
+  write.csv(
+    model_kompromisowy,
+    file.path(results_dir, paste0("kompromisowy_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  wykres_auc <- ggplot(
+    porownanie,
+    aes(x = reorder(model, AUC_test), y = AUC_test)
+  ) +
+    geom_col() +
+    coord_flip() +
+    labs(
+      title = paste("Porównanie AUC test dla drzew klasyfikacyjnych:", target),
+      x = "Model",
+      y = "AUC test"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("05_porownanie_AUC_classification_tree_", suffix, ".png"),
+    wykres_auc,
+    szerokosc = 9,
+    wysokosc = 5
+  )
+  
+  wykres_f1 <- ggplot(
+    porownanie,
+    aes(x = reorder(model, F1_test), y = F1_test)
+  ) +
+    geom_col() +
+    coord_flip() +
+    labs(
+      title = paste("Porównanie F1 test dla drzew klasyfikacyjnych:", target),
+      x = "Model",
+      y = "F1 test"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("06_porownanie_F1_classification_tree_", suffix, ".png"),
+    wykres_f1,
+    szerokosc = 9,
+    wysokosc = 5
+  )
+  
+  najlepsza_nazwa <- najlepszy_model$model[1]
+  p_best_test <- predykcje_test[[najlepsza_nazwa]]
+  
+  roc_best <- dane_roc(y_test, p_best_test)
+  
+  wykres_roc <- ggplot(
+    roc_best,
+    aes(x = FPR, y = TPR)
+  ) +
+    geom_line() +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+    labs(
+      title = paste("Krzywa ROC najlepszego drzewa klasyfikacyjnego:", target),
+      subtitle = paste("Model:", najlepsza_nazwa),
+      x = "False Positive Rate",
+      y = "True Positive Rate"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("07_ROC_classification_tree_", suffix, ".png"),
+    wykres_roc,
+    szerokosc = 7,
+    wysokosc = 6
+  )
+  
+  dane_kalibracja <- data.frame(
+    y = y_test,
+    p = p_best_test
+  )
+  
+  dane_kalibracja$grupa <- cut(
+    dane_kalibracja$p,
+    breaks = seq(0, 1, by = 0.1),
+    include.lowest = TRUE
+  )
+  
+  kalibracja <- dane_kalibracja %>%
+    dplyr::group_by(grupa) %>%
+    dplyr::summarise(
+      srednie_p = mean(p, na.rm = TRUE),
+      czestosc_klasy_1 = mean(y, na.rm = TRUE),
+      n = dplyr::n(),
+      .groups = "drop"
+    )
+  
+  write.csv(
+    kalibracja,
+    file.path(results_dir, paste0("kalibracja_classification_tree_", suffix, ".csv")),
+    row.names = FALSE
+  )
+  
+  wykres_kalibracja <- ggplot(
+    kalibracja,
+    aes(x = srednie_p, y = czestosc_klasy_1)
+  ) +
+    geom_point(aes(size = n)) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+    labs(
+      title = paste("Kalibracja najlepszego drzewa klasyfikacyjnego:", target),
+      subtitle = paste("Model:", najlepsza_nazwa),
+      x = "Średnie prawdopodobieństwo predykcji",
+      y = "Rzeczywista częstość klasy 1",
+      size = "Liczba obserwacji"
+    ) +
+    theme_minimal()
+  
+  zapisz_gg(
+    paste0("08_kalibracja_classification_tree_", suffix, ".png"),
+    wykres_kalibracja,
+    szerokosc = 7,
+    wysokosc = 6
+  )
+  
+  zapisz_wykres(paste0("09_szereg_prawdopodobienstw_classification_tree_", suffix, ".png"), {
+    n_plot <- min(500, nrow(test_data))
+    
+    plot(
+      test_data$datetime[1:n_plot],
+      y_test[1:n_plot],
+      type = "h",
+      ylim = c(0, 1),
+      main = paste("Najlepsze drzewo klasyfikacyjne: klasa i prawdopodobieństwo:", target),
+      xlab = "Czas",
+      ylab = "Klasa / prawdopodobieństwo"
+    )
+    
+    lines(
+      test_data$datetime[1:n_plot],
+      p_best_test[1:n_plot],
+      lwd = 2
+    )
+    
+    legend(
+      "topright",
+      legend = c("Klasa rzeczywista", "Prawdopodobieństwo predykcji"),
+      lty = c(1, 1),
+      lwd = c(1, 2),
+      bty = "n"
+    )
+  })
+  
+  cat("\n--- Opis danych ---\n")
+  print(opis_danych)
+  
+  cat("\n--- Wybór CP ---\n")
+  print(cp_wybor)
+  
+  cat("\n--- Najlepszy model według AUC test ---\n")
+  print(najlepszy_model)
+  
+  cat("\n--- Model kompromisowy w granicy 1% od najlepszego AUC test ---\n")
+  print(model_kompromisowy)
+  
+  cat("\n--- Porównanie końcowe ---\n")
+  print(porownanie)
+  
+  list(
+    target = target,
+    opis_danych = opis_danych,
+    cp_wybor = cp_wybor,
+    porownanie = porownanie,
+    najlepszy_model = najlepszy_model,
+    model_kompromisowy = model_kompromisowy
+  )
+}
+
+# ------------------------------------------------------------
+# 7. Uruchomienie analizy
+# ------------------------------------------------------------
+
+wyniki_regresja <- lapply(targety_regresja, analizuj_drzewo_regresyjne)
+wyniki_klasyfikacja <- lapply(targety_klasyfikacja, analizuj_drzewo_klasyfikacyjne)
+
+# ------------------------------------------------------------
+# 8. Zbiorcze tabele
+# ------------------------------------------------------------
+
+zbiorcze_opis_regresja <- do.call(
+  rbind,
+  lapply(wyniki_regresja, function(x) x$opis_danych)
+)
+
+zbiorcze_cp_regresja <- do.call(
+  rbind,
+  lapply(wyniki_regresja, function(x) x$cp_wybor)
+)
+
+zbiorcze_porownanie_regresja <- do.call(
+  rbind,
+  lapply(wyniki_regresja, function(x) x$porownanie)
+)
+
+zbiorcze_najlepsze_regresja <- do.call(
+  rbind,
+  lapply(wyniki_regresja, function(x) x$najlepszy_model)
+)
+
+zbiorcze_kompromisowe_regresja <- do.call(
+  rbind,
+  lapply(wyniki_regresja, function(x) x$model_kompromisowy)
+)
+
+zbiorcze_opis_klasyfikacja <- do.call(
+  rbind,
+  lapply(wyniki_klasyfikacja, function(x) x$opis_danych)
+)
+
+zbiorcze_cp_klasyfikacja <- do.call(
+  rbind,
+  lapply(wyniki_klasyfikacja, function(x) x$cp_wybor)
+)
+
+zbiorcze_porownanie_klasyfikacja <- do.call(
+  rbind,
+  lapply(wyniki_klasyfikacja, function(x) x$porownanie)
+)
+
+zbiorcze_najlepsze_klasyfikacja <- do.call(
+  rbind,
+  lapply(wyniki_klasyfikacja, function(x) x$najlepszy_model)
+)
+
+zbiorcze_kompromisowe_klasyfikacja <- do.call(
+  rbind,
+  lapply(wyniki_klasyfikacja, function(x) x$model_kompromisowy)
+)
+
+rownames(zbiorcze_porownanie_regresja) <- NULL
+rownames(zbiorcze_najlepsze_regresja) <- NULL
+rownames(zbiorcze_kompromisowe_regresja) <- NULL
+rownames(zbiorcze_porownanie_klasyfikacja) <- NULL
+rownames(zbiorcze_najlepsze_klasyfikacja) <- NULL
+rownames(zbiorcze_kompromisowe_klasyfikacja) <- NULL
+
+write.csv(
+  zbiorcze_opis_regresja,
+  file.path(results_dir, "zbiorcze_opis_regression_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_cp_regresja,
+  file.path(results_dir, "zbiorcze_wybor_cp_regression_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_porownanie_regresja,
+  file.path(results_dir, "zbiorcze_porownanie_regression_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_najlepsze_regresja,
+  file.path(results_dir, "zbiorcze_najlepsze_regression_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_kompromisowe_regresja,
+  file.path(results_dir, "zbiorcze_kompromisowe_regression_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_opis_klasyfikacja,
+  file.path(results_dir, "zbiorcze_opis_classification_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_cp_klasyfikacja,
+  file.path(results_dir, "zbiorcze_wybor_cp_classification_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_porownanie_klasyfikacja,
+  file.path(results_dir, "zbiorcze_porownanie_classification_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_najlepsze_klasyfikacja,
+  file.path(results_dir, "zbiorcze_najlepsze_classification_tree.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  zbiorcze_kompromisowe_klasyfikacja,
+  file.path(results_dir, "zbiorcze_kompromisowe_classification_tree.csv"),
+  row.names = FALSE
+)
+
+# ------------------------------------------------------------
+# 9. Komunikat końcowy
+# ------------------------------------------------------------
+
+cat("\n============================================================\n")
+cat("ZAKOŃCZONO ANALIZĘ DRZEW DECYZYJNYCH\n")
+cat("Predykcja regresyjna dotyczy wartości w następnej godzinie: t + 1.\n")
+cat("Predykcja klasyfikacyjna dotyczy przekroczenia progów w następnej godzinie: t + 1.\n")
+cat("Wykresy zapisano w folderze:", plot_dir, "\n")
+cat("Tabele zapisano w folderze:", results_dir, "\n")
+cat("============================================================\n")
+
+cat("\nZbiorcze najlepsze drzewa regresyjne:\n")
+print(zbiorcze_najlepsze_regresja)
+
+cat("\nZbiorcze drzewa regresyjne kompromisowe:\n")
+print(zbiorcze_kompromisowe_regresja)
+
+cat("\nZbiorcze najlepsze drzewa klasyfikacyjne:\n")
+print(zbiorcze_najlepsze_klasyfikacja)
+
+cat("\nZbiorcze drzewa klasyfikacyjne kompromisowe:\n")
+print(zbiorcze_kompromisowe_klasyfikacja)
+
+cat("\nZbiorcze porównanie drzew regresyjnych:\n")
+print(zbiorcze_porownanie_regresja)
+
+cat("\nZbiorcze porównanie drzew klasyfikacyjnych:\n")
+print(zbiorcze_porownanie_klasyfikacja)

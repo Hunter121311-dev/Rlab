@@ -1,0 +1,698 @@
+Call:
+rpart(formula = formula_tree, data = train_data, method = "class", 
+    parms = list(split = "gini"), control = rpart.control(cp = 1e-04, 
+        minsplit = 100, minbucket = 50, maxdepth = 10, xval = 10))
+  n= 229199 
+
+             CP nsplit rel error    xerror        xstd
+1  0.8032548854      0 1.0000000 1.0000000 0.005087911
+2  0.0014217436      1 0.1967451 0.1969871 0.002406144
+3  0.0006150806      4 0.1924799 0.1938714 0.002387592
+4  0.0004234981      7 0.1906346 0.1934781 0.002385238
+5  0.0003932482     11 0.1889406 0.1930849 0.002382883
+6  0.0003629984     13 0.1881542 0.1926614 0.002380343
+7  0.0003100611     14 0.1877912 0.1924799 0.002379253
+8  0.0003024986     18 0.1865509 0.1927824 0.002381069
+9  0.0002873737     19 0.1862484 0.1929941 0.002382339
+10 0.0002621655     21 0.1856737 0.1929336 0.002381976
+11 0.0002268740     28 0.1836469 0.1927824 0.002381069
+12 0.0001739367     30 0.1831932 0.1922379 0.002377800
+
+Variable importance
+ wind_speed_10m wind_speed_100m  wind_gusts_10m 
+             41              29              29 
+
+Node number 1: 229199 observations,    complexity param=0.8032549
+  predicted class=0  expected loss=0.1442327  P(node) =1
+    class counts: 196141 33058
+   probabilities: 0.856 0.144 
+  left son=2 (196141 obs) right son=3 (33058 obs)
+  Primary splits:
+      wind_speed_10m       < 27.75       to the left,  improve=44319.560, (0 missing)
+      wind_speed_100m      < 40.35       to the left,  improve=37860.900, (0 missing)
+      wind_gusts_10m       < 46.25       to the left,  improve=36393.630, (0 missing)
+      pressure_msl         < 1006.15     to the right, improve= 2593.205, (0 missing)
+      apparent_temperature < 2.85        to the right, improve= 2161.026, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 40.65       to the left,  agree=0.964, adj=0.750, (0 split)
+      wind_gusts_10m       < 46.6        to the left,  agree=0.964, adj=0.750, (0 split)
+      pressure_msl         < 987.05      to the right, agree=0.857, adj=0.011, (0 split)
+      apparent_temperature < -20.35      to the right, agree=0.856, adj=0.000, (0 split)
+
+Node number 2: 196141 observations,    complexity param=0.0004234981
+  predicted class=0  expected loss=0.01657991  P(node) =0.8557673
+    class counts: 192889  3252
+   probabilities: 0.983 0.017 
+  left son=4 (188798 obs) right son=5 (7343 obs)
+  Primary splits:
+      wind_speed_10m  < 26.35       to the left,  improve=1107.36700, (0 missing)
+      wind_speed_100m < 36.75       to the left,  improve= 559.89380, (0 missing)
+      wind_gusts_10m  < 41.2        to the left,  improve= 533.23910, (0 missing)
+      pressure_msl    < 1007.15     to the right, improve=  30.83839, (0 missing)
+      precipitation   < 0.05        to the left,  improve=  26.40193, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 41.65       to the left,  agree=0.967, adj=0.123, (0 split)
+      wind_gusts_10m  < 48.8        to the left,  agree=0.963, adj=0.024, (0 split)
+
+Node number 3: 33058 observations,    complexity param=0.001421744
+  predicted class=1  expected loss=0.09837256  P(node) =0.1442327
+    class counts:  3252 29806
+   probabilities: 0.098 0.902 
+  left son=6 (6743 obs) right son=7 (26315 obs)
+  Primary splits:
+      wind_speed_10m       < 29.25       to the left,  improve=1144.59600, (0 missing)
+      wind_speed_100m      < 44.25       to the left,  improve= 583.20820, (0 missing)
+      wind_gusts_10m       < 52.4        to the left,  improve= 367.41380, (0 missing)
+      apparent_temperature < 11.95       to the right, improve=  54.80940, (0 missing)
+      temperature_2m       < 16.55       to the right, improve=  36.46336, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 47.7        to the left,  agree=0.860, adj=0.315, (0 split)
+      wind_speed_100m      < 40.85       to the left,  agree=0.854, adj=0.285, (0 split)
+      apparent_temperature < 18.25       to the right, agree=0.798, adj=0.011, (0 split)
+      temperature_2m       < 21.35       to the right, agree=0.798, adj=0.008, (0 split)
+      dew_point_2m         < 15.55       to the right, agree=0.797, adj=0.005, (0 split)
+
+Node number 4: 188798 observations
+  predicted class=0  expected loss=0.00610176  P(node) =0.8237296
+    class counts: 187646  1152
+   probabilities: 0.994 0.006 
+
+Node number 5: 7343 observations,    complexity param=0.0004234981
+  predicted class=0  expected loss=0.2859867  P(node) =0.03203766
+    class counts:  5243  2100
+   probabilities: 0.714 0.286 
+  left son=10 (3176 obs) right son=11 (4167 obs)
+  Primary splits:
+      wind_speed_10m  < 26.95       to the left,  improve=82.27624, (0 missing)
+      sin_godzina     < 0.7071068   to the left,  improve=44.60808, (0 missing)
+      wind_dir_cos    < -0.2079117  to the right, improve=18.69673, (0 missing)
+      wind_speed_100m < 37.55       to the left,  improve=15.96407, (0 missing)
+      pressure_msl    < 1007.15     to the right, improve=11.98010, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 42.65       to the left,  agree=0.605, adj=0.087, (0 split)
+      wind_speed_100m      < 35.55       to the left,  agree=0.592, adj=0.056, (0 split)
+      apparent_temperature < 16.25       to the right, agree=0.570, adj=0.005, (0 split)
+      temperature_2m       < 19.95       to the right, agree=0.569, adj=0.004, (0 split)
+      relative_humidity_2m < 41.5        to the left,  agree=0.568, adj=0.002, (0 split)
+
+Node number 6: 6743 observations,    complexity param=0.001421744
+  predicted class=1  expected loss=0.3582975  P(node) =0.02941985
+    class counts:  2416  4327
+   probabilities: 0.358 0.642 
+  left son=12 (2439 obs) right son=13 (4304 obs)
+  Primary splits:
+      wind_speed_10m < 28.25       to the left,  improve=108.87310, (0 missing)
+      sin_godzina    < 0.7071068   to the left,  improve= 44.03738, (0 missing)
+      wind_dir_cos   < -0.2923717  to the right, improve= 42.14001, (0 missing)
+      wind_gusts_10m < 49.5        to the right, improve= 33.52078, (0 missing)
+      wind_dir_sin   < -0.8910065  to the left,  improve= 20.19833, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 36.65       to the left,  agree=0.654, adj=0.044, (0 split)
+      wind_gusts_10m       < 44.45       to the left,  agree=0.644, adj=0.015, (0 split)
+      pressure_msl         < 982.4       to the left,  agree=0.639, adj=0.002, (0 split)
+      relative_humidity_2m < 39.5        to the left,  agree=0.639, adj=0.002, (0 split)
+      precipitation        < 2.05        to the right, agree=0.639, adj=0.002, (0 split)
+
+Node number 7: 26315 observations
+  predicted class=1  expected loss=0.03176895  P(node) =0.1148129
+    class counts:   836 25479
+   probabilities: 0.032 0.968 
+
+Node number 10: 3176 observations
+  predicted class=0  expected loss=0.2002519  P(node) =0.01385695
+    class counts:  2540   636
+   probabilities: 0.800 0.200 
+
+Node number 11: 4167 observations,    complexity param=0.0004234981
+  predicted class=0  expected loss=0.3513319  P(node) =0.01818071
+    class counts:  2703  1464
+   probabilities: 0.649 0.351 
+  left son=22 (3011 obs) right son=23 (1156 obs)
+  Primary splits:
+      sin_godzina    < 0.6035534   to the left,  improve=36.141670, (0 missing)
+      wind_dir_cos   < -0.2079117  to the right, improve=19.023500, (0 missing)
+      wind_gusts_10m < 44.45       to the right, improve=18.821300, (0 missing)
+      wind_speed_10m < 27.45       to the left,  improve=18.158010, (0 missing)
+      wind_dir_sin   < -0.9563048  to the left,  improve= 8.603363, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 49.05       to the left,  agree=0.723, adj=0.002, (0 split)
+      temperature_2m       < -11.65      to the right, agree=0.723, adj=0.002, (0 split)
+      dew_point_2m         < -15.3       to the right, agree=0.723, adj=0.002, (0 split)
+      apparent_temperature < -19.15      to the right, agree=0.723, adj=0.002, (0 split)
+      sin_dzien            < 0.9999537   to the left,  agree=0.723, adj=0.002, (0 split)
+
+Node number 12: 2439 observations,    complexity param=0.001421744
+  predicted class=1  expected loss=0.4776548  P(node) =0.01064141
+    class counts:  1165  1274
+   probabilities: 0.478 0.522 
+  left son=24 (1439 obs) right son=25 (1000 obs)
+  Primary splits:
+      wind_gusts_10m  < 45.9        to the right, improve=35.72229, (0 missing)
+      wind_dir_cos    < -0.2840045  to the right, improve=24.44869, (0 missing)
+      sin_godzina     < 0.7071068   to the left,  improve=18.61688, (0 missing)
+      wind_dir_sin    < -0.9587832  to the left,  improve=12.85983, (0 missing)
+      wind_speed_100m < 43.65       to the left,  improve=11.49534, (0 missing)
+  Surrogate splits:
+      shortwave_radiation  < 0.5         to the right, agree=0.618, adj=0.068, (0 split)
+      cos_godzina          < 0.6035534   to the left,  agree=0.614, adj=0.059, (0 split)
+      is_day               < 0.5         to the right, agree=0.609, adj=0.047, (0 split)
+      temperature_2m       < 1.25        to the right, agree=0.603, adj=0.032, (0 split)
+      apparent_temperature < -5.35       to the right, agree=0.603, adj=0.031, (0 split)
+
+Node number 13: 4304 observations,    complexity param=0.0003100611
+  predicted class=1  expected loss=0.2906599  P(node) =0.01877844
+    class counts:  1251  3053
+   probabilities: 0.291 0.709 
+  left son=26 (1510 obs) right son=27 (2794 obs)
+  Primary splits:
+      wind_gusts_10m < 49.15       to the right, improve=30.92008, (0 missing)
+      sin_godzina    < 0.7071068   to the left,  improve=28.79053, (0 missing)
+      wind_speed_10m < 28.55       to the left,  improve=21.26668, (0 missing)
+      wind_dir_cos   < -0.2164314  to the right, improve=20.83613, (0 missing)
+      wind_dir_sin   < -0.8829476  to the left,  improve=10.12532, (0 missing)
+  Surrogate splits:
+      shortwave_radiation  < 286.5       to the right, agree=0.680, adj=0.089, (0 split)
+      relative_humidity_2m < 57.5        to the left,  agree=0.672, adj=0.065, (0 split)
+      cos_godzina          < -0.8660254  to the left,  agree=0.664, adj=0.042, (0 split)
+      temperature_2m       < 17.55       to the right, agree=0.656, adj=0.019, (0 split)
+      apparent_temperature < 14.05       to the right, agree=0.654, adj=0.013, (0 split)
+
+Node number 22: 3011 observations
+  predicted class=0  expected loss=0.3105281  P(node) =0.01313706
+    class counts:  2076   935
+   probabilities: 0.689 0.311 
+
+Node number 23: 1156 observations,    complexity param=0.0004234981
+  predicted class=0  expected loss=0.4576125  P(node) =0.005043652
+    class counts:   627   529
+   probabilities: 0.542 0.458 
+  left son=46 (578 obs) right son=47 (578 obs)
+  Primary splits:
+      is_day              < 0.5         to the left,  improve=19.074390, (0 missing)
+      shortwave_radiation < 5.5         to the left,  improve=19.072060, (0 missing)
+      cos_dzien           < 0.5631299   to the right, improve= 8.811843, (0 missing)
+      wind_gusts_10m      < 45.2        to the right, improve= 8.371207, (0 missing)
+      cos_godzina         < 0.1294095   to the right, improve= 6.183984, (0 missing)
+  Surrogate splits:
+      shortwave_radiation < 0.5         to the left,  agree=0.965, adj=0.929, (0 split)
+      cos_godzina         < -0.1294095  to the right, agree=0.829, adj=0.657, (0 split)
+      cos_dzien           < 0.3334564   to the right, agree=0.712, adj=0.424, (0 split)
+      polrocze_cieple     < 0.5         to the left,  agree=0.683, adj=0.367, (0 split)
+      temperature_2m      < 8.15        to the left,  agree=0.679, adj=0.358, (0 split)
+
+Node number 24: 1439 observations,    complexity param=0.0006150806
+  predicted class=0  expected loss=0.4510076  P(node) =0.006278387
+    class counts:   790   649
+   probabilities: 0.549 0.451 
+  left son=48 (341 obs) right son=49 (1098 obs)
+  Primary splits:
+      sin_godzina         < -0.7071068  to the left,  improve=12.791410, (0 missing)
+      wind_dir_cos        < -0.3255682  to the right, improve=11.195260, (0 missing)
+      shortwave_radiation < 635.5       to the left,  improve= 8.372746, (0 missing)
+      wind_speed_100m     < 43.65       to the left,  improve= 8.298118, (0 missing)
+      wind_dir_sin        < -0.9587832  to the left,  improve= 5.781496, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 47.75       to the right, agree=0.765, adj=0.009, (0 split)
+      wind_dir_cos    < 0.9996193   to the right, agree=0.764, adj=0.006, (0 split)
+
+Node number 25: 1000 observations,    complexity param=0.0002621655
+  predicted class=1  expected loss=0.375  P(node) =0.004363021
+    class counts:   375   625
+   probabilities: 0.375 0.625 
+  left son=50 (668 obs) right son=51 (332 obs)
+  Primary splits:
+      sin_godzina     < 0.7071068   to the left,  improve=10.889910, (0 missing)
+      wind_dir_cos    < -0.2503705  to the right, improve= 9.872060, (0 missing)
+      wind_speed_100m < 43.95       to the left,  improve= 7.076575, (0 missing)
+      wind_dir_sin    < -0.9681108  to the left,  improve= 6.533361, (0 missing)
+      cos_godzina     < 0.3794095   to the right, improve= 5.466212, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m < 38.35       to the right, agree=0.672, adj=0.012, (0 split)
+      dew_point_2m   < 15.65       to the left,  agree=0.672, adj=0.012, (0 split)
+      pressure_msl   < 989.2       to the right, agree=0.672, adj=0.012, (0 split)
+      cos_dzien      < 0.9996296   to the left,  agree=0.672, adj=0.012, (0 split)
+      wind_dir_cos   < 0.9980968   to the left,  agree=0.670, adj=0.006, (0 split)
+
+Node number 26: 1510 observations,    complexity param=0.0003100611
+  predicted class=1  expected loss=0.3721854  P(node) =0.006588161
+    class counts:   562   948
+   probabilities: 0.372 0.628 
+  left son=52 (452 obs) right son=53 (1058 obs)
+  Primary splits:
+      sin_godzina     < -0.6035534  to the left,  improve=13.815230, (0 missing)
+      wind_dir_sin    < 0.8480481   to the left,  improve= 9.540566, (0 missing)
+      wind_speed_100m < 38.15       to the right, improve= 7.669479, (0 missing)
+      wind_speed_10m  < 28.55       to the left,  improve= 7.226269, (0 missing)
+      wind_dir_cos    < 0.1822286   to the right, improve= 5.263879, (0 missing)
+  Surrogate splits:
+      relative_humidity_2m < 96.5        to the right, agree=0.703, adj=0.007, (0 split)
+      pressure_msl         < 1033.95     to the right, agree=0.703, adj=0.007, (0 split)
+      cos_dzien            < 0.9996296   to the right, agree=0.702, adj=0.004, (0 split)
+      dew_point_2m         < 17.85       to the right, agree=0.701, adj=0.002, (0 split)
+      precipitation        < 3.35        to the right, agree=0.701, adj=0.002, (0 split)
+
+Node number 27: 2794 observations
+  predicted class=1  expected loss=0.2465999  P(node) =0.01219028
+    class counts:   689  2105
+   probabilities: 0.247 0.753 
+
+Node number 46: 578 observations
+  predicted class=0  expected loss=0.366782  P(node) =0.002521826
+    class counts:   366   212
+   probabilities: 0.633 0.367 
+
+Node number 47: 578 observations,    complexity param=0.0003932482
+  predicted class=1  expected loss=0.4515571  P(node) =0.002521826
+    class counts:   261   317
+   probabilities: 0.452 0.548 
+  left son=94 (394 obs) right son=95 (184 obs)
+  Primary splits:
+      wind_gusts_10m      < 43.75       to the right, improve=8.498850, (0 missing)
+      sin_dzien           < 0.9690009   to the left,  improve=5.570906, (0 missing)
+      wind_speed_100m     < 36.25       to the left,  improve=3.402403, (0 missing)
+      cloud_cover         < 21.5        to the right, improve=3.314906, (0 missing)
+      shortwave_radiation < 223.5       to the right, improve=3.132200, (0 missing)
+  Surrogate splits:
+      relative_humidity_2m < 88.5        to the left,  agree=0.701, adj=0.060, (0 split)
+      cos_dzien            < 0.9383426   to the left,  agree=0.690, adj=0.027, (0 split)
+      precipitation        < 0.75        to the left,  agree=0.689, adj=0.022, (0 split)
+      cos_godzina          < 0.3794095   to the left,  agree=0.685, adj=0.011, (0 split)
+      wind_dir_sin         < -0.9999238  to the right, agree=0.683, adj=0.005, (0 split)
+
+Node number 48: 341 observations,    complexity param=0.0003024986
+  predicted class=0  expected loss=0.3313783  P(node) =0.00148779
+    class counts:   228   113
+   probabilities: 0.669 0.331 
+  left son=96 (269 obs) right son=97 (72 obs)
+  Primary splits:
+      wind_speed_100m     < 43.35       to the left,  improve=10.345700, (0 missing)
+      wind_dir_cos        < -0.3987339  to the right, improve= 9.827997, (0 missing)
+      cloud_cover         < 66.5        to the left,  improve= 7.781551, (0 missing)
+      is_day              < 0.5         to the right, improve= 7.428905, (0 missing)
+      shortwave_radiation < 27.5        to the right, improve= 6.764462, (0 missing)
+  Surrogate splits:
+      pressure_msl < 1036.9      to the left,  agree=0.795, adj=0.028, (0 split)
+      wind_dir_cos < -0.9779986  to the right, agree=0.792, adj=0.014, (0 split)
+
+Node number 49: 1098 observations,    complexity param=0.0006150806
+  predicted class=0  expected loss=0.4881603  P(node) =0.004790597
+    class counts:   562   536
+   probabilities: 0.512 0.488 
+  left son=98 (1039 obs) right son=99 (59 obs)
+  Primary splits:
+      shortwave_radiation  < 635.5       to the left,  improve=6.240462, (0 missing)
+      pressure_msl         < 997.3       to the left,  improve=6.033157, (0 missing)
+      relative_humidity_2m < 90.5        to the right, improve=5.227520, (0 missing)
+      is_day               < 0.5         to the left,  improve=5.132511, (0 missing)
+      wind_dir_cos         < -0.2840045  to the right, improve=4.654977, (0 missing)
+  Surrogate splits:
+      temperature_2m       < 22.15       to the left,  agree=0.953, adj=0.119, (0 split)
+      apparent_temperature < 20.35       to the left,  agree=0.953, adj=0.119, (0 split)
+      wind_speed_100m      < 34.75       to the right, agree=0.949, adj=0.051, (0 split)
+      relative_humidity_2m < 40.5        to the right, agree=0.947, adj=0.017, (0 split)
+
+Node number 50: 668 observations,    complexity param=0.0002621655
+  predicted class=1  expected loss=0.4221557  P(node) =0.002914498
+    class counts:   282   386
+   probabilities: 0.422 0.578 
+  left son=100 (332 obs) right son=101 (336 obs)
+  Primary splits:
+      wind_dir_cos    < -0.2503705  to the right, improve=9.964361, (0 missing)
+      wind_dir_sin    < -0.9681108  to the left,  improve=6.662551, (0 missing)
+      wind_speed_100m < 43.85       to the left,  improve=6.479188, (0 missing)
+      cos_dzien       < 0.3008087   to the left,  improve=5.253610, (0 missing)
+      temperature_2m  < 3.75        to the right, improve=4.738026, (0 missing)
+  Surrogate splits:
+      wind_dir_sin    < -0.9681108  to the left,  agree=0.750, adj=0.497, (0 split)
+      wind_speed_100m < 39.45       to the left,  agree=0.650, adj=0.295, (0 split)
+      cos_dzien       < 0.4132633   to the left,  agree=0.641, adj=0.277, (0 split)
+      cloud_cover     < 82.5        to the left,  agree=0.587, adj=0.169, (0 split)
+      sin_dzien       < 0.2595094   to the right, agree=0.581, adj=0.157, (0 split)
+
+Node number 51: 332 observations
+  predicted class=1  expected loss=0.2801205  P(node) =0.001448523
+    class counts:    93   239
+   probabilities: 0.280 0.720 
+
+Node number 52: 452 observations,    complexity param=0.0003100611
+  predicted class=1  expected loss=0.4756637  P(node) =0.001972085
+    class counts:   215   237
+   probabilities: 0.476 0.524 
+  left son=104 (352 obs) right son=105 (100 obs)
+  Primary splits:
+      precipitation        < 0.15        to the left,  improve=8.852784, (0 missing)
+      cloud_cover          < 48.5        to the left,  improve=8.269228, (0 missing)
+      relative_humidity_2m < 65.5        to the left,  improve=7.676582, (0 missing)
+      shortwave_radiation  < 57.5        to the right, improve=7.248078, (0 missing)
+      wind_dir_cos         < -0.04361773 to the right, improve=5.528632, (0 missing)
+  Surrogate splits:
+      relative_humidity_2m < 89.5        to the left,  agree=0.796, adj=0.08, (0 split)
+      temperature_2m       < -4.05       to the right, agree=0.785, adj=0.03, (0 split)
+      apparent_temperature < -11.45      to the right, agree=0.785, adj=0.03, (0 split)
+      pressure_msl         < 991.05      to the right, agree=0.785, adj=0.03, (0 split)
+      dew_point_2m         < 18.35       to the left,  agree=0.783, adj=0.02, (0 split)
+
+Node number 53: 1058 observations
+  predicted class=1  expected loss=0.3279773  P(node) =0.004616076
+    class counts:   347   711
+   probabilities: 0.328 0.672 
+
+Node number 94: 394 observations,    complexity param=0.0003932482
+  predicted class=0  expected loss=0.4898477  P(node) =0.00171903
+    class counts:   201   193
+   probabilities: 0.510 0.490 
+  left son=188 (276 obs) right son=189 (118 obs)
+  Primary splits:
+      wind_dir_sin         < -0.1305212  to the left,  improve=2.516301, (0 missing)
+      precipitation        < 0.15        to the right, improve=2.220916, (0 missing)
+      wind_speed_100m      < 36.15       to the left,  improve=2.199351, (0 missing)
+      apparent_temperature < -3.75       to the right, improve=1.966190, (0 missing)
+      cloud_cover          < 34.5        to the right, improve=1.926215, (0 missing)
+  Surrogate splits:
+      temperature_2m       < 0.9         to the right, agree=0.772, adj=0.237, (0 split)
+      apparent_temperature < -5.45       to the right, agree=0.772, adj=0.237, (0 split)
+      pressure_msl         < 1022.1      to the left,  agree=0.761, adj=0.203, (0 split)
+      dew_point_2m         < -3.65       to the right, agree=0.754, adj=0.178, (0 split)
+      wind_dir_cos         < 0.6625948   to the left,  agree=0.734, adj=0.110, (0 split)
+
+Node number 95: 184 observations
+  predicted class=1  expected loss=0.326087  P(node) =0.0008027958
+    class counts:    60   124
+   probabilities: 0.326 0.674 
+
+Node number 96: 269 observations
+  predicted class=0  expected loss=0.267658  P(node) =0.001173653
+    class counts:   197    72
+   probabilities: 0.732 0.268 
+
+Node number 97: 72 observations
+  predicted class=1  expected loss=0.4305556  P(node) =0.0003141375
+    class counts:    31    41
+   probabilities: 0.431 0.569 
+
+Node number 98: 1039 observations,    complexity param=0.0006150806
+  predicted class=0  expected loss=0.4754572  P(node) =0.004533179
+    class counts:   545   494
+   probabilities: 0.525 0.475 
+  left son=196 (589 obs) right son=197 (450 obs)
+  Primary splits:
+      wind_dir_cos         < -0.2840045  to the right, improve=6.613613, (0 missing)
+      wind_speed_100m      < 41.85       to the left,  improve=5.158082, (0 missing)
+      pressure_msl         < 997.3       to the left,  improve=5.133509, (0 missing)
+      relative_humidity_2m < 90.5        to the right, improve=4.481388, (0 missing)
+      wind_gusts_10m       < 49.5        to the right, improve=3.919760, (0 missing)
+  Surrogate splits:
+      wind_dir_sin    < -0.9563048  to the left,  agree=0.729, adj=0.373, (0 split)
+      pressure_msl    < 1008.55     to the right, agree=0.654, adj=0.202, (0 split)
+      wind_speed_100m < 42.45       to the left,  agree=0.641, adj=0.171, (0 split)
+      cos_dzien       < 0.6453242   to the left,  agree=0.616, adj=0.113, (0 split)
+      temperature_2m  < -0.35       to the right, agree=0.598, adj=0.071, (0 split)
+
+Node number 99: 59 observations
+  predicted class=1  expected loss=0.2881356  P(node) =0.0002574182
+    class counts:    17    42
+   probabilities: 0.288 0.712 
+
+Node number 100: 332 observations,    complexity param=0.0002621655
+  predicted class=0  expected loss=0.4909639  P(node) =0.001448523
+    class counts:   169   163
+   probabilities: 0.509 0.491 
+  left son=200 (282 obs) right son=201 (50 obs)
+  Primary splits:
+      temperature_2m       < 0.55        to the right, improve=5.144365, (0 missing)
+      apparent_temperature < -5.55       to the right, improve=5.139659, (0 missing)
+      dew_point_2m         < -2.5        to the right, improve=4.741849, (0 missing)
+      wind_speed_10m       < 28.15       to the left,  improve=2.858747, (0 missing)
+      precipitation        < 0.05        to the left,  improve=2.820352, (0 missing)
+  Surrogate splits:
+      apparent_temperature < -6.35       to the right, agree=0.988, adj=0.92, (0 split)
+      dew_point_2m         < -2.75       to the right, agree=0.937, adj=0.58, (0 split)
+      wind_dir_sin         < 0.9968794   to the left,  agree=0.855, adj=0.04, (0 split)
+      pressure_msl         < 992.05      to the right, agree=0.852, adj=0.02, (0 split)
+
+Node number 101: 336 observations
+  predicted class=1  expected loss=0.3363095  P(node) =0.001465975
+    class counts:   113   223
+   probabilities: 0.336 0.664 
+
+Node number 104: 352 observations,    complexity param=0.0003100611
+  predicted class=0  expected loss=0.4715909  P(node) =0.001535783
+    class counts:   186   166
+   probabilities: 0.528 0.472 
+  left son=208 (291 obs) right son=209 (61 obs)
+  Primary splits:
+      wind_dir_sin         < 0.2503705   to the left,  improve=5.934888, (0 missing)
+      wind_gusts_10m       < 53.8        to the right, improve=4.615967, (0 missing)
+      relative_humidity_2m < 65.5        to the left,  improve=4.430280, (0 missing)
+      shortwave_radiation  < 41          to the right, improve=4.316225, (0 missing)
+      cloud_cover          < 48.5        to the left,  improve=4.031672, (0 missing)
+  Surrogate splits:
+      temperature_2m       < -2.65       to the right, agree=0.847, adj=0.115, (0 split)
+      apparent_temperature < -9.8        to the right, agree=0.847, adj=0.115, (0 split)
+      dew_point_2m         < -9.25       to the right, agree=0.844, adj=0.098, (0 split)
+      pressure_msl         < 1027.95     to the left,  agree=0.832, adj=0.033, (0 split)
+      sin_dzien            < -0.9978802  to the right, agree=0.830, adj=0.016, (0 split)
+
+Node number 105: 100 observations
+  predicted class=1  expected loss=0.29  P(node) =0.0004363021
+    class counts:    29    71
+   probabilities: 0.290 0.710 
+
+Node number 188: 276 observations,    complexity param=0.000226874
+  predicted class=0  expected loss=0.4528986  P(node) =0.001204194
+    class counts:   151   125
+   probabilities: 0.547 0.453 
+  left son=376 (79 obs) right son=377 (197 obs)
+  Primary splits:
+      sin_dzien            < 0.534328    to the right, improve=2.733597, (0 missing)
+      dew_point_2m         < 6.25        to the left,  improve=2.155362, (0 missing)
+      temperature_2m       < 4.95        to the left,  improve=1.585893, (0 missing)
+      cos_godzina          < -0.3794095  to the left,  improve=1.561637, (0 missing)
+      apparent_temperature < 4.85        to the left,  improve=1.472503, (0 missing)
+  Surrogate splits:
+      dew_point_2m         < 6.35        to the left,  agree=0.841, adj=0.443, (0 split)
+      temperature_2m       < 5.75        to the left,  agree=0.837, adj=0.430, (0 split)
+      apparent_temperature < 0.1         to the left,  agree=0.833, adj=0.418, (0 split)
+      pressure_msl         < 995.8       to the left,  agree=0.746, adj=0.114, (0 split)
+      relative_humidity_2m < 55          to the left,  agree=0.739, adj=0.089, (0 split)
+
+Node number 189: 118 observations
+  predicted class=1  expected loss=0.4237288  P(node) =0.0005148365
+    class counts:    50    68
+   probabilities: 0.424 0.576 
+
+Node number 196: 589 observations,    complexity param=0.0002621655
+  predicted class=0  expected loss=0.426146  P(node) =0.002569819
+    class counts:   338   251
+   probabilities: 0.574 0.426 
+  left son=392 (52 obs) right son=393 (537 obs)
+  Primary splits:
+      pressure_msl        < 1000.8      to the left,  improve=6.237430, (0 missing)
+      wind_gusts_10m      < 48.05       to the right, improve=5.034530, (0 missing)
+      wind_speed_10m      < 28.05       to the left,  improve=4.562638, (0 missing)
+      shortwave_radiation < 0.5         to the left,  improve=3.597837, (0 missing)
+      is_day              < 0.5         to the left,  improve=3.394314, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m < 60.5        to the right, agree=0.913, adj=0.019, (0 split)
+
+Node number 197: 450 observations,    complexity param=0.0003629984
+  predicted class=1  expected loss=0.46  P(node) =0.001963359
+    class counts:   207   243
+   probabilities: 0.460 0.540 
+  left son=394 (256 obs) right son=395 (194 obs)
+  Primary splits:
+      wind_speed_100m     < 41.95       to the left,  improve=4.779394, (0 missing)
+      wind_dir_cos        < -0.8869771  to the left,  improve=3.699959, (0 missing)
+      shortwave_radiation < 320         to the right, improve=3.550698, (0 missing)
+      pressure_msl        < 997.3       to the left,  improve=3.528000, (0 missing)
+      wind_dir_sin        < -0.5372791  to the right, improve=3.201967, (0 missing)
+  Surrogate splits:
+      shortwave_radiation  < 40.5        to the right, agree=0.749, adj=0.418, (0 split)
+      cos_godzina          < -0.6035534  to the left,  agree=0.731, adj=0.376, (0 split)
+      is_day               < 0.5         to the right, agree=0.718, adj=0.345, (0 split)
+      sin_godzina          < 0.7865661   to the left,  agree=0.642, adj=0.170, (0 split)
+      relative_humidity_2m < 78.5        to the left,  agree=0.618, adj=0.113, (0 split)
+
+Node number 200: 282 observations,    complexity param=0.0002621655
+  predicted class=0  expected loss=0.4539007  P(node) =0.001230372
+    class counts:   154   128
+   probabilities: 0.546 0.454 
+  left son=400 (231 obs) right son=401 (51 obs)
+  Primary splits:
+      precipitation   < 0.15        to the left,  improve=4.645829, (0 missing)
+      wind_speed_100m < 42.25       to the left,  improve=2.556345, (0 missing)
+      cos_godzina     < 0.9159756   to the right, improve=2.215833, (0 missing)
+      dew_point_2m    < 9.3         to the left,  improve=1.962193, (0 missing)
+      sin_godzina     < -0.9159756  to the right, improve=1.944820, (0 missing)
+  Surrogate splits:
+      pressure_msl < 991.25      to the right, agree=0.833, adj=0.078, (0 split)
+      sin_dzien    < -0.9960675  to the right, agree=0.823, adj=0.020, (0 split)
+
+Node number 201: 50 observations
+  predicted class=1  expected loss=0.3  P(node) =0.000218151
+    class counts:    15    35
+   probabilities: 0.300 0.700 
+
+Node number 208: 291 observations
+  predicted class=0  expected loss=0.4295533  P(node) =0.001269639
+    class counts:   166   125
+   probabilities: 0.570 0.430 
+
+Node number 209: 61 observations
+  predicted class=1  expected loss=0.3278689  P(node) =0.0002661443
+    class counts:    20    41
+   probabilities: 0.328 0.672 
+
+Node number 376: 79 observations
+  predicted class=0  expected loss=0.3417722  P(node) =0.0003446786
+    class counts:    52    27
+   probabilities: 0.658 0.342 
+
+Node number 377: 197 observations,    complexity param=0.000226874
+  predicted class=0  expected loss=0.4974619  P(node) =0.0008595151
+    class counts:    99    98
+   probabilities: 0.503 0.497 
+  left son=754 (66 obs) right son=755 (131 obs)
+  Primary splits:
+      wind_dir_cos    < 0.04361773  to the right, improve=2.795634, (0 missing)
+      cos_godzina     < -0.3794095  to the left,  improve=1.757800, (0 missing)
+      sin_godzina     < 0.9159756   to the left,  improve=1.294783, (0 missing)
+      wind_speed_100m < 39.75       to the left,  improve=1.216870, (0 missing)
+      precipitation   < 0.05        to the right, improve=1.126416, (0 missing)
+  Surrogate splits:
+      apparent_temperature < 12.55       to the right, agree=0.706, adj=0.121, (0 split)
+      cloud_cover          < 37.5        to the left,  agree=0.706, adj=0.121, (0 split)
+      shortwave_radiation  < 438.5       to the right, agree=0.706, adj=0.121, (0 split)
+      temperature_2m       < 15.55       to the right, agree=0.701, adj=0.106, (0 split)
+      relative_humidity_2m < 67.5        to the left,  agree=0.695, adj=0.091, (0 split)
+
+Node number 392: 52 observations
+  predicted class=0  expected loss=0.1923077  P(node) =0.0002268771
+    class counts:    42    10
+   probabilities: 0.808 0.192 
+
+Node number 393: 537 observations,    complexity param=0.0002621655
+  predicted class=0  expected loss=0.4487896  P(node) =0.002342942
+    class counts:   296   241
+   probabilities: 0.551 0.449 
+  left son=786 (305 obs) right son=787 (232 obs)
+  Primary splits:
+      wind_speed_10m      < 28.05       to the left,  improve=4.852788, (0 missing)
+      wind_gusts_10m      < 48.05       to the right, improve=4.308739, (0 missing)
+      shortwave_radiation < 0.5         to the left,  improve=2.485174, (0 missing)
+      is_day              < 0.5         to the left,  improve=2.250209, (0 missing)
+      pressure_msl        < 1020.05     to the right, improve=2.126805, (0 missing)
+  Surrogate splits:
+      wind_dir_sin    < -0.9980968  to the right, agree=0.616, adj=0.112, (0 split)
+      wind_dir_cos    < 0.04361773  to the right, agree=0.594, adj=0.060, (0 split)
+      wind_speed_100m < 44.05       to the left,  agree=0.581, adj=0.030, (0 split)
+      sin_dzien       < 0.989305    to the left,  agree=0.581, adj=0.030, (0 split)
+      wind_gusts_10m  < 53.8        to the left,  agree=0.575, adj=0.017, (0 split)
+
+Node number 394: 256 observations,    complexity param=0.0002873737
+  predicted class=0  expected loss=0.4765625  P(node) =0.001116933
+    class counts:   134   122
+   probabilities: 0.523 0.477 
+  left son=788 (57 obs) right son=789 (199 obs)
+  Primary splits:
+      wind_dir_cos         < -0.8480481  to the left,  improve=3.661622, (0 missing)
+      apparent_temperature < 9.3         to the left,  improve=3.041663, (0 missing)
+      sin_dzien            < 0.7086201   to the right, improve=3.008532, (0 missing)
+      cos_godzina          < 0.1294095   to the right, improve=2.506741, (0 missing)
+      temperature_2m       < 13.9        to the left,  improve=2.388138, (0 missing)
+  Surrogate splits:
+      sin_dzien       < 0.9990649   to the right, agree=0.789, adj=0.053, (0 split)
+      wind_speed_100m < 41.85       to the right, agree=0.785, adj=0.035, (0 split)
+      cos_dzien       < 0.9996296   to the right, agree=0.785, adj=0.035, (0 split)
+
+Node number 395: 194 observations
+  predicted class=1  expected loss=0.3762887  P(node) =0.000846426
+    class counts:    73   121
+   probabilities: 0.376 0.624 
+
+Node number 400: 231 observations
+  predicted class=0  expected loss=0.4112554  P(node) =0.001007858
+    class counts:   136    95
+   probabilities: 0.589 0.411 
+
+Node number 401: 51 observations
+  predicted class=1  expected loss=0.3529412  P(node) =0.0002225141
+    class counts:    18    33
+   probabilities: 0.353 0.647 
+
+Node number 754: 66 observations
+  predicted class=0  expected loss=0.3787879  P(node) =0.0002879594
+    class counts:    41    25
+   probabilities: 0.621 0.379 
+
+Node number 755: 131 observations
+  predicted class=1  expected loss=0.4427481  P(node) =0.0005715557
+    class counts:    58    73
+   probabilities: 0.443 0.557 
+
+Node number 786: 305 observations
+  predicted class=0  expected loss=0.3901639  P(node) =0.001330721
+    class counts:   186   119
+   probabilities: 0.610 0.390 
+
+Node number 787: 232 observations,    complexity param=0.0002621655
+  predicted class=1  expected loss=0.4741379  P(node) =0.001012221
+    class counts:   110   122
+   probabilities: 0.474 0.526 
+  left son=1574 (92 obs) right son=1575 (140 obs)
+  Primary splits:
+      cos_dzien           < 0.2843487   to the right, improve=3.169158, (0 missing)
+      shortwave_radiation < 1           to the left,  improve=2.801759, (0 missing)
+      is_day              < 0.5         to the left,  improve=2.482862, (0 missing)
+      sin_godzina         < 0.7865661   to the left,  improve=2.293611, (0 missing)
+      pressure_msl        < 1008.45     to the left,  improve=1.702005, (0 missing)
+  Surrogate splits:
+      polrocze_cieple      < 0.5         to the left,  agree=0.866, adj=0.663, (0 split)
+      temperature_2m       < 8.85        to the left,  agree=0.750, adj=0.370, (0 split)
+      apparent_temperature < 3.95        to the left,  agree=0.750, adj=0.370, (0 split)
+      dew_point_2m         < 5.45        to the left,  agree=0.707, adj=0.261, (0 split)
+      wind_speed_100m      < 39.75       to the right, agree=0.694, adj=0.228, (0 split)
+
+Node number 788: 57 observations
+  predicted class=0  expected loss=0.3333333  P(node) =0.0002486922
+    class counts:    38    19
+   probabilities: 0.667 0.333 
+
+Node number 789: 199 observations,    complexity param=0.0002873737
+  predicted class=1  expected loss=0.4824121  P(node) =0.0008682411
+    class counts:    96   103
+   probabilities: 0.482 0.518 
+  left son=1578 (94 obs) right son=1579 (105 obs)
+  Primary splits:
+      shortwave_radiation  < 120.5       to the left,  improve=2.361889, (0 missing)
+      relative_humidity_2m < 81.5        to the right, improve=2.338921, (0 missing)
+      apparent_temperature < 9.3         to the left,  improve=2.144561, (0 missing)
+      cos_godzina          < -0.9159756  to the right, improve=1.930614, (0 missing)
+      temperature_2m       < 13.9        to the left,  improve=1.594512, (0 missing)
+  Surrogate splits:
+      relative_humidity_2m < 79.5        to the right, agree=0.799, adj=0.574, (0 split)
+      cos_dzien            < 0.5910643   to the right, agree=0.794, adj=0.564, (0 split)
+      cos_godzina          < -0.1294095  to the right, agree=0.759, adj=0.489, (0 split)
+      temperature_2m       < 7.55        to the left,  agree=0.744, adj=0.457, (0 split)
+      apparent_temperature < 1.35        to the left,  agree=0.734, adj=0.436, (0 split)
+
+Node number 1574: 92 observations
+  predicted class=0  expected loss=0.423913  P(node) =0.0004013979
+    class counts:    53    39
+   probabilities: 0.576 0.424 
+
+Node number 1575: 140 observations
+  predicted class=1  expected loss=0.4071429  P(node) =0.0006108229
+    class counts:    57    83
+   probabilities: 0.407 0.593 
+
+Node number 1578: 94 observations
+  predicted class=0  expected loss=0.4361702  P(node) =0.000410124
+    class counts:    53    41
+   probabilities: 0.564 0.436 
+
+Node number 1579: 105 observations
+  predicted class=1  expected loss=0.4095238  P(node) =0.0004581172
+    class counts:    43    62
+   probabilities: 0.410 0.590 
+

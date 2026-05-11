@@ -1,0 +1,653 @@
+Call:
+rpart(formula = formula_tree, data = train_data, method = "anova", 
+    control = rpart.control(cp = 1e-04, minsplit = 100, minbucket = 50, 
+        maxdepth = 10, xval = 10))
+  n= 229199 
+
+             CP nsplit  rel error     xerror         xstd
+1  0.6220686061      0 1.00000000 1.00001344 0.0033434516
+2  0.1223655732      1 0.37793139 0.37809756 0.0015050023
+3  0.1090436410      2 0.25556582 0.25685212 0.0008418024
+4  0.0236424428      3 0.14652218 0.14662638 0.0006871105
+5  0.0188898200      4 0.12287974 0.12350783 0.0004470027
+6  0.0155138294      5 0.10398992 0.10446930 0.0004220689
+7  0.0149896618      6 0.08847609 0.08414179 0.0003930682
+8  0.0049103989      7 0.07348643 0.07366934 0.0003799824
+9  0.0033766720      8 0.06857603 0.06880516 0.0003018131
+10 0.0024622854      9 0.06519935 0.06603067 0.0002941543
+11 0.0024420454     10 0.06273707 0.06203771 0.0002881451
+12 0.0023808179     11 0.06029502 0.06027111 0.0002848288
+13 0.0023101690     12 0.05791421 0.05781954 0.0002825293
+14 0.0019926944     13 0.05560404 0.05538225 0.0002794488
+15 0.0018815674     14 0.05361134 0.05377501 0.0002774907
+16 0.0008254064     15 0.05172978 0.05194840 0.0002747681
+17 0.0008096966     16 0.05090437 0.05133928 0.0002706524
+18 0.0004729695     17 0.05009467 0.05037216 0.0002613721
+19 0.0004343349     18 0.04962170 0.05000634 0.0002606168
+20 0.0004212992     19 0.04918737 0.04979709 0.0002603735
+21 0.0003312089     20 0.04876607 0.04918109 0.0002585943
+22 0.0003281031     21 0.04843486 0.04854604 0.0002581028
+23 0.0003210788     22 0.04810676 0.04823371 0.0002575698
+24 0.0003114636     23 0.04778568 0.04785196 0.0002569056
+25 0.0002862180     24 0.04747421 0.04756841 0.0002572590
+26 0.0002809757     25 0.04718800 0.04712804 0.0002567659
+27 0.0002750865     26 0.04690702 0.04693445 0.0002565818
+28 0.0002706726     27 0.04663193 0.04676765 0.0002563458
+29 0.0002439141     28 0.04636126 0.04661980 0.0002561088
+30 0.0002290096     29 0.04611735 0.04638051 0.0002560188
+31 0.0001876172     30 0.04588834 0.04617444 0.0002559318
+32 0.0001474202     31 0.04570072 0.04586982 0.0002537407
+33 0.0001248336     32 0.04555330 0.04578685 0.0002529130
+
+Variable importance
+ wind_speed_10m  wind_gusts_10m wind_speed_100m    pressure_msl    wind_dir_sin       cos_dzien 
+             38              29              28               2               1               1 
+
+Node number 1: 229199 observations,    complexity param=0.6220686
+  mean=18.48101, MSE=75.61695 
+  left son=2 (142366 obs) right son=3 (86833 obs)
+  Primary splits:
+      wind_speed_10m       < 20.25        to the left,  improve=0.62206860, (0 missing)
+      wind_speed_100m      < 30.85        to the left,  improve=0.58574650, (0 missing)
+      wind_gusts_10m       < 35.45        to the left,  improve=0.57354450, (0 missing)
+      pressure_msl         < 1006.15      to the right, improve=0.06522596, (0 missing)
+      apparent_temperature < 13.25        to the right, improve=0.06196321, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 34.75        to the left,  agree=0.931, adj=0.819, (0 split)
+      wind_speed_100m < 30.45        to the left,  agree=0.920, adj=0.789, (0 split)
+      pressure_msl    < 1004.35      to the right, agree=0.652, adj=0.080, (0 split)
+      wind_dir_sin    < -0.9536806   to the right, agree=0.640, adj=0.050, (0 split)
+      cos_dzien       < 0.8335558    to the left,  agree=0.637, adj=0.041, (0 split)
+
+Node number 2: 142366 observations,    complexity param=0.1090436
+  mean=13.12467, MSE=21.58446 
+  left son=4 (64420 obs) right son=5 (77946 obs)
+  Primary splits:
+      wind_speed_10m       < 12.75        to the left,  improve=0.61501360, (0 missing)
+      wind_speed_100m      < 19.35        to the left,  improve=0.51522190, (0 missing)
+      wind_gusts_10m       < 22.15        to the left,  improve=0.46753290, (0 missing)
+      relative_humidity_2m < 92.5         to the right, improve=0.01842465, (0 missing)
+      wind_dir_cos         < 0.4461808    to the right, improve=0.00942939, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 22.15        to the left,  agree=0.877, adj=0.729, (0 split)
+      wind_speed_100m      < 19.15        to the left,  agree=0.866, adj=0.705, (0 split)
+      relative_humidity_2m < 91.5         to the right, agree=0.581, adj=0.074, (0 split)
+      apparent_temperature < 16.95        to the right, agree=0.562, adj=0.031, (0 split)
+      wind_dir_cos         < 0.7008826    to the right, agree=0.558, adj=0.023, (0 split)
+
+Node number 3: 86833 observations,    complexity param=0.1223656
+  mean=27.26293, MSE=40.04423 
+  left son=6 (62842 obs) right son=7 (23991 obs)
+  Primary splits:
+      wind_speed_10m       < 29.85        to the left,  improve=0.60991090, (0 missing)
+      wind_speed_100m      < 44.25        to the left,  improve=0.57217190, (0 missing)
+      wind_gusts_10m       < 52.4         to the left,  improve=0.54237820, (0 missing)
+      pressure_msl         < 1006.15      to the right, improve=0.05750743, (0 missing)
+      apparent_temperature < 11.75        to the right, improve=0.04264239, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 43.85        to the left,  agree=0.930, adj=0.745, (0 split)
+      wind_gusts_10m       < 50.6         to the left,  agree=0.927, adj=0.737, (0 split)
+      pressure_msl         < 987.65       to the right, agree=0.729, adj=0.020, (0 split)
+      apparent_temperature < -17.65       to the right, agree=0.724, adj=0.001, (0 split)
+      dew_point_2m         < -17.45       to the right, agree=0.724, adj=0.000, (0 split)
+
+Node number 4: 64420 observations,    complexity param=0.01551383
+  mean=9.11693, MSE=9.28218 
+  left son=8 (25841 obs) right son=9 (38579 obs)
+  Primary splits:
+      wind_speed_10m       < 8.45         to the left,  improve=0.449655800, (0 missing)
+      wind_speed_100m      < 11.55        to the left,  improve=0.354070700, (0 missing)
+      wind_gusts_10m       < 14.2         to the left,  improve=0.234716600, (0 missing)
+      relative_humidity_2m < 90.5         to the right, improve=0.007448941, (0 missing)
+      wind_dir_cos         < -0.008726203 to the right, improve=0.005546320, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 11.55        to the left,  agree=0.841, adj=0.604, (0 split)
+      wind_gusts_10m       < 14.6         to the left,  agree=0.801, adj=0.504, (0 split)
+      relative_humidity_2m < 93.5         to the right, agree=0.611, adj=0.031, (0 split)
+      wind_dir_sin         < -0.9999238   to the left,  agree=0.601, adj=0.005, (0 split)
+      wind_dir_cos         < 0.9996954    to the right, agree=0.601, adj=0.005, (0 split)
+
+Node number 5: 77946 observations,    complexity param=0.01498966
+  mean=16.43694, MSE=7.506017 
+  left son=10 (39856 obs) right son=11 (38090 obs)
+  Primary splits:
+      wind_speed_10m       < 16.55        to the left,  improve=0.444038200, (0 missing)
+      wind_speed_100m      < 24.25        to the left,  improve=0.203795500, (0 missing)
+      wind_gusts_10m       < 27.55        to the left,  improve=0.179385300, (0 missing)
+      sin_godzina          < 0.7071068    to the left,  improve=0.008783645, (0 missing)
+      apparent_temperature < 16.85        to the right, improve=0.006839593, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 27.9         to the left,  agree=0.788, adj=0.566, (0 split)
+      wind_speed_100m      < 24.85        to the left,  agree=0.739, adj=0.466, (0 split)
+      cos_dzien            < 0.3737197    to the left,  agree=0.529, adj=0.036, (0 split)
+      apparent_temperature < 3.85         to the right, agree=0.528, adj=0.035, (0 split)
+      pressure_msl         < 1014.15      to the right, agree=0.528, adj=0.033, (0 split)
+
+Node number 6: 62842 observations,    complexity param=0.01888982
+  mean=24.2094, MSE=10.17443 
+  left son=12 (36083 obs) right son=13 (26759 obs)
+  Primary splits:
+      wind_speed_10m       < 24.65        to the left,  improve=0.51203510, (0 missing)
+      wind_speed_100m      < 36.75        to the left,  improve=0.33034810, (0 missing)
+      wind_gusts_10m       < 41.95        to the left,  improve=0.28718360, (0 missing)
+      apparent_temperature < 14.85        to the right, improve=0.01609992, (0 missing)
+      cos_dzien            < -0.1585535   to the left,  improve=0.01151036, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 41.6         to the left,  agree=0.830, adj=0.602, (0 split)
+      wind_speed_100m < 36.65        to the left,  agree=0.805, adj=0.543, (0 split)
+      pressure_msl    < 997.45       to the right, agree=0.579, adj=0.011, (0 split)
+      precipitation   < 0.25         to the left,  agree=0.576, adj=0.005, (0 split)
+      wind_dir_sin    < -0.9990102   to the right, agree=0.576, adj=0.003, (0 split)
+
+Node number 7: 23991 observations,    complexity param=0.02364244
+  mean=35.26134, MSE=29.88708 
+  left son=14 (17585 obs) right son=15 (6406 obs)
+  Primary splits:
+      wind_speed_10m       < 37.65        to the left,  improve=0.57146870, (0 missing)
+      wind_speed_100m      < 55.45        to the left,  improve=0.54269700, (0 missing)
+      wind_gusts_10m       < 64.25        to the left,  improve=0.47418890, (0 missing)
+      pressure_msl         < 1007.25      to the right, improve=0.05808444, (0 missing)
+      apparent_temperature < 11.35        to the right, improve=0.02382400, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 54.65        to the left,  agree=0.937, adj=0.762, (0 split)
+      wind_gusts_10m       < 63.9         to the left,  agree=0.912, adj=0.671, (0 split)
+      pressure_msl         < 984.75       to the right, agree=0.736, adj=0.010, (0 split)
+      apparent_temperature < -20.95       to the right, agree=0.733, adj=0.000, (0 split)
+      precipitation        < 4.55         to the left,  agree=0.733, adj=0.000, (0 split)
+
+Node number 8: 25841 observations,    complexity param=0.002310169
+  mean=6.620692, MSE=5.842369 
+  left son=16 (10547 obs) right son=17 (15294 obs)
+  Primary splits:
+      wind_speed_10m      < 6.05         to the left,  improve=0.265202300, (0 missing)
+      wind_speed_100m     < 7.05         to the left,  improve=0.192542600, (0 missing)
+      wind_gusts_10m      < 10.25        to the left,  improve=0.079201930, (0 missing)
+      wind_dir_sin        < 0.01744975   to the left,  improve=0.007702727, (0 missing)
+      shortwave_radiation < 34.5         to the right, improve=0.003964556, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 7.75         to the left,  agree=0.834, adj=0.592, (0 split)
+      wind_gusts_10m       < 10.25        to the left,  agree=0.710, adj=0.289, (0 split)
+      wind_dir_sin         < -0.9999238   to the left,  agree=0.596, adj=0.010, (0 split)
+      wind_dir_cos         < 0.9996954    to the right, agree=0.595, adj=0.007, (0 split)
+      relative_humidity_2m < 98.5         to the right, agree=0.594, adj=0.005, (0 split)
+
+Node number 9: 38579 observations,    complexity param=0.002380818
+  mean=10.78896, MSE=4.616762 
+  left son=18 (18272 obs) right son=19 (20307 obs)
+  Primary splits:
+      wind_speed_10m  < 10.65        to the left,  improve=0.231669900, (0 missing)
+      wind_speed_100m < 17.85        to the left,  improve=0.063046750, (0 missing)
+      wind_gusts_10m  < 16           to the left,  improve=0.039060830, (0 missing)
+      sin_godzina     < -0.6035534   to the left,  improve=0.007304737, (0 missing)
+      wind_dir_cos    < 0.06104621   to the right, improve=0.006760509, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 17.8         to the left,  agree=0.701, adj=0.369, (0 split)
+      wind_speed_100m      < 14.45        to the left,  agree=0.669, adj=0.300, (0 split)
+      relative_humidity_2m < 95.5         to the right, agree=0.533, adj=0.013, (0 split)
+      wind_dir_cos         < 0.8038263    to the right, agree=0.531, adj=0.009, (0 split)
+      pressure_msl         < 1025.55      to the right, agree=0.530, adj=0.007, (0 split)
+
+Node number 10: 39856 observations,    complexity param=0.001992694
+  mean=14.65221, MSE=4.176191 
+  left son=20 (20428 obs) right son=21 (19428 obs)
+  Primary splits:
+      wind_speed_10m  < 14.75        to the left,  improve=0.207490700, (0 missing)
+      wind_speed_100m < 19.05        to the left,  improve=0.040457720, (0 missing)
+      sin_godzina     < -0.6035534   to the left,  improve=0.016074390, (0 missing)
+      wind_gusts_10m  < 23.6         to the left,  improve=0.013515080, (0 missing)
+      wind_dir_cos    < -0.06104621  to the right, improve=0.007816188, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 24.65        to the left,  agree=0.682, adj=0.348, (0 split)
+      wind_speed_100m      < 23.05        to the left,  agree=0.626, adj=0.233, (0 split)
+      wind_dir_sin         < -0.9889782   to the right, agree=0.519, adj=0.013, (0 split)
+      relative_humidity_2m < 70.5         to the right, agree=0.518, adj=0.012, (0 split)
+      cos_dzien            < 0.7882759    to the left,  agree=0.517, adj=0.009, (0 split)
+
+Node number 11: 38090 observations,    complexity param=0.001881567
+  mean=18.30443, MSE=4.169782 
+  left son=22 (18144 obs) right son=23 (19946 obs)
+  Primary splits:
+      wind_speed_10m  < 18.25        to the left,  improve=0.20531820, (0 missing)
+      wind_speed_100m < 24.05        to the left,  improve=0.04464392, (0 missing)
+      sin_godzina     < 0.7071068    to the left,  improve=0.01765535, (0 missing)
+      wind_gusts_10m  < 29.7         to the left,  improve=0.01013052, (0 missing)
+      wind_dir_cos    < -0.1478038   to the right, improve=0.00639845, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 30.4         to the left,  agree=0.678, adj=0.323, (0 split)
+      wind_speed_100m      < 25.75        to the left,  agree=0.637, adj=0.237, (0 split)
+      apparent_temperature < 16.85        to the right, agree=0.534, adj=0.021, (0 split)
+      dew_point_2m         < 14.25        to the right, agree=0.530, adj=0.014, (0 split)
+      temperature_2m       < 19.05        to the right, agree=0.528, adj=0.010, (0 split)
+
+Node number 12: 36083 observations,    complexity param=0.002462285
+  mean=22.24383, MSE=4.614784 
+  left son=24 (18525 obs) right son=25 (17558 obs)
+  Primary splits:
+      wind_speed_10m       < 22.35        to the left,  improve=0.256280900, (0 missing)
+      wind_speed_100m      < 31.15        to the left,  improve=0.072218830, (0 missing)
+      wind_gusts_10m       < 35.45        to the left,  improve=0.029287360, (0 missing)
+      sin_godzina          < 0.6035534    to the left,  improve=0.016817410, (0 missing)
+      relative_humidity_2m < 76.5         to the left,  improve=0.007368182, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 37.25        to the left,  agree=0.704, adj=0.392, (0 split)
+      wind_speed_100m      < 32.05        to the left,  agree=0.669, adj=0.320, (0 split)
+      cos_dzien            < 0.2177152    to the left,  agree=0.532, adj=0.038, (0 split)
+      apparent_temperature < 1.45         to the right, agree=0.528, adj=0.030, (0 split)
+      polrocze_cieple      < 0.5          to the right, agree=0.527, adj=0.027, (0 split)
+
+Node number 13: 26759 observations,    complexity param=0.002442045
+  mean=26.85986, MSE=5.43669 
+  left son=26 (14654 obs) right son=27 (12105 obs)
+  Primary splits:
+      wind_speed_10m       < 27.15        to the left,  improve=0.290925100, (0 missing)
+      wind_speed_100m      < 38.75        to the left,  improve=0.103018500, (0 missing)
+      wind_gusts_10m       < 43.75        to the left,  improve=0.058883850, (0 missing)
+      sin_godzina          < 0.258819     to the left,  improve=0.010010690, (0 missing)
+      apparent_temperature < 15.85        to the right, improve=0.006987705, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 45.2         to the left,  agree=0.727, adj=0.397, (0 split)
+      wind_speed_100m < 39.45        to the left,  agree=0.707, adj=0.353, (0 split)
+      pressure_msl    < 997.75       to the right, agree=0.551, adj=0.007, (0 split)
+      precipitation   < 0.15         to the left,  agree=0.550, adj=0.005, (0 split)
+      wind_dir_cos    < 0.9781476    to the left,  agree=0.549, adj=0.003, (0 split)
+
+Node number 14: 17585 observations,    complexity param=0.003376672
+  mean=32.76698, MSE=8.366468 
+  left son=28 (10346 obs) right son=29 (7239 obs)
+  Primary splits:
+      wind_speed_10m       < 33.25        to the left,  improve=0.39777390, (0 missing)
+      wind_speed_100m      < 48.55        to the left,  improve=0.26495230, (0 missing)
+      wind_gusts_10m       < 56.35        to the left,  improve=0.17825420, (0 missing)
+      apparent_temperature < 11.95        to the right, improve=0.01162650, (0 missing)
+      pressure_msl         < 1005.95      to the right, improve=0.01048349, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 48.45        to the left,  agree=0.810, adj=0.538, (0 split)
+      wind_gusts_10m       < 56           to the left,  agree=0.795, adj=0.502, (0 split)
+      pressure_msl         < 988.85       to the right, agree=0.591, adj=0.008, (0 split)
+      apparent_temperature < -13.85       to the right, agree=0.590, adj=0.004, (0 split)
+      dew_point_2m         < -13.05       to the right, agree=0.590, adj=0.003, (0 split)
+
+Node number 15: 6406 observations,    complexity param=0.004910399
+  mean=42.10859, MSE=24.99868 
+  left son=30 (5130 obs) right son=31 (1276 obs)
+  Primary splits:
+      wind_speed_10m       < 45.35        to the left,  improve=0.53142820, (0 missing)
+      wind_speed_100m      < 65.55        to the left,  improve=0.51248860, (0 missing)
+      wind_gusts_10m       < 80.8         to the left,  improve=0.41317030, (0 missing)
+      pressure_msl         < 1002.95      to the right, improve=0.04231162, (0 missing)
+      apparent_temperature < 0.05         to the right, improve=0.02127221, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 66.15        to the left,  agree=0.955, adj=0.774, (0 split)
+      wind_gusts_10m  < 78.65        to the left,  agree=0.917, adj=0.584, (0 split)
+      cos_dzien       < 0.9999259    to the left,  agree=0.801, adj=0.002, (0 split)
+      pressure_msl    < 966.35       to the right, agree=0.801, adj=0.002, (0 split)
+      dew_point_2m    < 14.95        to the left,  agree=0.801, adj=0.001, (0 split)
+
+Node number 16: 10547 observations,    complexity param=0.0004343349
+  mean=5.121769, MSE=5.043029 
+  left son=32 (4290 obs) right son=33 (6257 obs)
+  Primary splits:
+      wind_speed_10m  < 4.25         to the left,  improve=0.141526000, (0 missing)
+      wind_speed_100m < 5.45         to the left,  improve=0.066864040, (0 missing)
+      wind_gusts_10m  < 7.75         to the left,  improve=0.021371880, (0 missing)
+      wind_dir_sin    < 0.01744975   to the left,  improve=0.013073340, (0 missing)
+      temperature_2m  < 19.55        to the left,  improve=0.008885974, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 5.15         to the left,  agree=0.818, adj=0.553, (0 split)
+      wind_gusts_10m  < 7.4          to the left,  agree=0.652, adj=0.144, (0 split)
+      wind_dir_sin    < -0.9984774   to the left,  agree=0.597, adj=0.010, (0 split)
+      wind_dir_cos    < 0.9996954    to the right, agree=0.597, adj=0.009, (0 split)
+      pressure_msl    < 1041.65      to the right, agree=0.595, adj=0.005, (0 split)
+
+Node number 17: 15294 observations,    complexity param=0.0002439141
+  mean=7.654374, MSE=3.775699 
+  left son=34 (6767 obs) right son=35 (8527 obs)
+  Primary splits:
+      wind_speed_10m      < 7.25         to the left,  improve=0.073206610, (0 missing)
+      wind_speed_100m     < 12.35        to the left,  improve=0.036026830, (0 missing)
+      wind_gusts_10m      < 11           to the left,  improve=0.009995897, (0 missing)
+      wind_dir_sin        < 0.1131989    to the left,  improve=0.005878439, (0 missing)
+      shortwave_radiation < 479.5        to the left,  improve=0.004676213, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 9.05         to the left,  agree=0.660, adj=0.232, (0 split)
+      wind_gusts_10m       < 12.05        to the left,  agree=0.631, adj=0.166, (0 split)
+      wind_dir_sin         < -0.993534    to the left,  agree=0.563, adj=0.013, (0 split)
+      relative_humidity_2m < 95.5         to the right, agree=0.560, adj=0.004, (0 split)
+      wind_dir_cos         < 0.993534     to the right, agree=0.559, adj=0.004, (0 split)
+
+Node number 18: 18272 observations,    complexity param=0.0002706726
+  mean=9.698692, MSE=3.685247 
+  left son=36 (9266 obs) right son=37 (9006 obs)
+  Primary splits:
+      wind_speed_10m      < 9.65         to the left,  improve=0.069666410, (0 missing)
+      wind_speed_100m     < 15.85        to the left,  improve=0.020509780, (0 missing)
+      wind_gusts_10m      < 13.5         to the left,  improve=0.007104332, (0 missing)
+      sin_godzina         < -0.6035534   to the left,  improve=0.006058178, (0 missing)
+      shortwave_radiation < 569.5        to the left,  improve=0.005513769, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 16           to the left,  agree=0.617, adj=0.224, (0 split)
+      wind_speed_100m      < 15.75        to the left,  agree=0.602, adj=0.193, (0 split)
+      relative_humidity_2m < 74.5         to the right, agree=0.523, adj=0.032, (0 split)
+      wind_dir_cos         < -0.9889782   to the right, agree=0.513, adj=0.013, (0 split)
+      shortwave_radiation  < 438.5        to the left,  agree=0.513, adj=0.012, (0 split)
+
+Node number 19: 20307 observations,    complexity param=0.0003281031
+  mean=11.76997, MSE=3.422982 
+  left son=38 (10278 obs) right son=39 (10029 obs)
+  Primary splits:
+      wind_speed_10m  < 11.75        to the left,  improve=0.081807280, (0 missing)
+      wind_speed_100m < 19.45        to the left,  improve=0.014450180, (0 missing)
+      sin_godzina     < -0.6035534   to the left,  improve=0.013763360, (0 missing)
+      wind_dir_cos    < -0.04361773  to the right, improve=0.007427564, (0 missing)
+      wind_gusts_10m  < 22.85        to the right, improve=0.007131582, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 20           to the left,  agree=0.619, adj=0.228, (0 split)
+      wind_speed_100m < 18.85        to the left,  agree=0.585, adj=0.159, (0 split)
+      cloud_cover     < 99.5         to the left,  agree=0.516, adj=0.020, (0 split)
+      pressure_msl    < 1010.85      to the right, agree=0.515, adj=0.018, (0 split)
+      wind_dir_sin    < -0.8526077   to the right, agree=0.515, adj=0.017, (0 split)
+
+Node number 20: 20428 observations,    complexity param=0.000286218
+  mean=13.74441, MSE=3.374934 
+  left son=40 (10309 obs) right son=41 (10119 obs)
+  Primary splits:
+      wind_speed_10m  < 13.75        to the left,  improve=0.071951140, (0 missing)
+      sin_godzina     < -0.6035534   to the left,  improve=0.015687620, (0 missing)
+      wind_gusts_10m  < 25.4         to the right, improve=0.010847970, (0 missing)
+      wind_dir_cos    < -0.0958421   to the right, improve=0.010263100, (0 missing)
+      wind_speed_100m < 21.65        to the left,  improve=0.009590071, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 23.6         to the left,  agree=0.606, adj=0.204, (0 split)
+      wind_speed_100m      < 21.75        to the left,  agree=0.567, adj=0.126, (0 split)
+      cos_dzien            < 0.5049424    to the left,  agree=0.515, adj=0.021, (0 split)
+      apparent_temperature < 4.55         to the right, agree=0.515, adj=0.020, (0 split)
+      polrocze_cieple      < 0.5          to the right, agree=0.514, adj=0.019, (0 split)
+
+Node number 21: 19428 observations,    complexity param=0.0002290096
+  mean=15.60674, MSE=3.241047 
+  left son=42 (10341 obs) right son=43 (9087 obs)
+  Primary splits:
+      wind_speed_10m  < 15.65        to the left,  improve=0.06303360, (0 missing)
+      sin_godzina     < -0.6035534   to the left,  improve=0.02150787, (0 missing)
+      wind_gusts_10m  < 29.7         to the right, improve=0.01273422, (0 missing)
+      wind_speed_100m < 24.65        to the left,  improve=0.01105927, (0 missing)
+      wind_dir_cos    < -0.1305212   to the right, improve=0.00906142, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 26.8         to the left,  agree=0.599, adj=0.142, (0 split)
+      wind_speed_100m      < 26.55        to the left,  agree=0.570, adj=0.080, (0 split)
+      apparent_temperature < 24.75        to the left,  agree=0.534, adj=0.003, (0 split)
+      temperature_2m       < 24.75        to the left,  agree=0.533, adj=0.002, (0 split)
+      dew_point_2m         < 18.45        to the left,  agree=0.533, adj=0.001, (0 split)
+
+Node number 22: 18144 observations,    complexity param=0.0001876172
+  mean=17.33429, MSE=3.232824 
+  left son=44 (9972 obs) right son=45 (8172 obs)
+  Primary splits:
+      wind_speed_10m       < 17.45        to the left,  improve=0.055435680, (0 missing)
+      sin_godzina          < 0.7071068    to the left,  improve=0.021512410, (0 missing)
+      wind_gusts_10m       < 31.85        to the right, improve=0.016467000, (0 missing)
+      wind_speed_100m      < 25.25        to the left,  improve=0.010484450, (0 missing)
+      relative_humidity_2m < 80.5         to the left,  improve=0.008432411, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 29.7         to the left,  agree=0.595, adj=0.102, (0 split)
+      wind_speed_100m      < 28.85        to the left,  agree=0.574, adj=0.053, (0 split)
+      apparent_temperature < -11.15       to the right, agree=0.551, adj=0.003, (0 split)
+      temperature_2m       < -5.45        to the right, agree=0.551, adj=0.003, (0 split)
+      sin_dzien            < 0.9986576    to the left,  agree=0.551, adj=0.003, (0 split)
+
+Node number 23: 19946 observations,    complexity param=0.0002809757
+  mean=19.18691, MSE=3.387174 
+  left son=46 (11148 obs) right son=47 (8798 obs)
+  Primary splits:
+      wind_speed_10m  < 19.35        to the left,  improve=0.072078780, (0 missing)
+      sin_godzina     < 0.7071068    to the left,  improve=0.022933810, (0 missing)
+      wind_speed_100m < 27.75        to the left,  improve=0.012987480, (0 missing)
+      wind_gusts_10m  < 34.75        to the right, improve=0.010475170, (0 missing)
+      wind_dir_cos    < -0.2249511   to the right, improve=0.008136172, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 33.3         to the left,  agree=0.605, adj=0.104, (0 split)
+      wind_speed_100m < 31.65        to the left,  agree=0.587, adj=0.063, (0 split)
+      wind_dir_sin    < -0.993534    to the right, agree=0.560, adj=0.003, (0 split)
+      pressure_msl    < 986.15       to the right, agree=0.559, adj=0.001, (0 split)
+      dew_point_2m    < -11.95       to the right, agree=0.559, adj=0.001, (0 split)
+
+Node number 24: 18525 observations,    complexity param=0.0002750865
+  mean=21.18508, MSE=3.371522 
+  left son=48 (7301 obs) right son=49 (11224 obs)
+  Primary splits:
+      wind_speed_10m       < 21.05        to the left,  improve=0.076333840, (0 missing)
+      sin_godzina          < 0.7071068    to the left,  improve=0.024007920, (0 missing)
+      wind_speed_100m      < 30.15        to the left,  improve=0.013613360, (0 missing)
+      relative_humidity_2m < 73.5         to the left,  improve=0.009758283, (0 missing)
+      wind_dir_cos         < 0.0958421    to the right, improve=0.008102745, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 33.3         to the left,  agree=0.649, adj=0.110, (0 split)
+      wind_speed_100m      < 27.45        to the left,  agree=0.642, adj=0.092, (0 split)
+      dew_point_2m         < 20.85        to the right, agree=0.606, adj=0.001, (0 split)
+      pressure_msl         < 972.65       to the left,  agree=0.606, adj=0.000, (0 split)
+      relative_humidity_2m < 36.5         to the left,  agree=0.606, adj=0.000, (0 split)
+
+Node number 25: 17558 observations,    complexity param=0.0003114636
+  mean=23.36088, MSE=3.496021 
+  left son=50 (9577 obs) right son=51 (7981 obs)
+  Primary splits:
+      wind_speed_10m       < 23.55        to the left,  improve=0.087940740, (0 missing)
+      sin_godzina          < 0.6035534    to the left,  improve=0.021264280, (0 missing)
+      wind_speed_100m      < 33.45        to the left,  improve=0.020821280, (0 missing)
+      wind_dir_cos         < -0.1218693   to the right, improve=0.009529275, (0 missing)
+      relative_humidity_2m < 77.5         to the left,  improve=0.008576581, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 40.15        to the left,  agree=0.612, adj=0.146, (0 split)
+      wind_speed_100m      < 37.05        to the left,  agree=0.595, adj=0.110, (0 split)
+      wind_dir_sin         < -0.9980968   to the right, agree=0.549, adj=0.009, (0 split)
+      wind_dir_cos         < -0.9980968   to the right, agree=0.546, adj=0.002, (0 split)
+      relative_humidity_2m < 39.5         to the right, agree=0.546, adj=0.001, (0 split)
+
+Node number 26: 14654 observations,    complexity param=0.0003312089
+  mean=25.71681, MSE=3.788987 
+  left son=52 (6966 obs) right son=53 (7688 obs)
+  Primary splits:
+      wind_speed_10m  < 25.75        to the left,  improve=0.103384300, (0 missing)
+      sin_godzina     < 0.7071068    to the left,  improve=0.017911720, (0 missing)
+      wind_speed_100m < 38.75        to the left,  improve=0.016082770, (0 missing)
+      wind_dir_cos    < 0.04361773   to the right, improve=0.008755507, (0 missing)
+      temperature_2m  < 18.55        to the right, improve=0.006685921, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m       < 41.6         to the left,  agree=0.638, adj=0.238, (0 split)
+      wind_speed_100m      < 35.75        to the left,  agree=0.616, adj=0.193, (0 split)
+      pressure_msl         < 1019.95      to the right, agree=0.531, adj=0.014, (0 split)
+      apparent_temperature < 15.15        to the right, agree=0.531, adj=0.014, (0 split)
+      temperature_2m       < 20.05        to the right, agree=0.530, adj=0.011, (0 split)
+
+Node number 27: 12105 observations,    complexity param=0.0003210788
+  mean=28.24359, MSE=3.934958 
+  left son=54 (5921 obs) right son=55 (6184 obs)
+  Primary splits:
+      wind_speed_10m       < 28.35        to the left,  improve=0.116825800, (0 missing)
+      wind_speed_100m      < 40.15        to the left,  improve=0.021442760, (0 missing)
+      sin_godzina          < 0.7071068    to the left,  improve=0.015100240, (0 missing)
+      wind_dir_cos         < -0.04361773  to the right, improve=0.009492574, (0 missing)
+      relative_humidity_2m < 72.5         to the left,  improve=0.006513326, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 46.25        to the left,  agree=0.641, adj=0.267, (0 split)
+      wind_speed_100m < 39.95        to the left,  agree=0.625, adj=0.233, (0 split)
+      pressure_msl    < 1018.55      to the right, agree=0.524, adj=0.027, (0 split)
+      wind_dir_cos    < -0.6224909   to the left,  agree=0.521, adj=0.022, (0 split)
+      cloud_cover     < 31.5         to the left,  agree=0.518, adj=0.014, (0 split)
+
+Node number 28: 10346 observations,    complexity param=0.0004212992
+  mean=31.24102, MSE=4.530395 
+  left son=56 (5660 obs) right son=57 (4686 obs)
+  Primary splits:
+      wind_speed_10m  < 31.55        to the left,  improve=0.155780800, (0 missing)
+      wind_speed_100m < 44.85        to the left,  improve=0.044549060, (0 missing)
+      sin_godzina     < 0.6035534    to the left,  improve=0.011452210, (0 missing)
+      wind_dir_cos    < -0.06104621  to the right, improve=0.010665320, (0 missing)
+      wind_gusts_10m  < 52           to the left,  improve=0.007597005, (0 missing)
+  Surrogate splits:
+      wind_gusts_10m  < 52           to the left,  agree=0.673, adj=0.278, (0 split)
+      wind_speed_100m < 46.35        to the left,  agree=0.657, adj=0.243, (0 split)
+      pressure_msl    < 982.4        to the right, agree=0.549, adj=0.004, (0 split)
+      dew_point_2m    < -8.15        to the right, agree=0.548, adj=0.003, (0 split)
+      wind_dir_cos    < -0.9968794   to the right, agree=0.548, adj=0.003, (0 split)
+
+Node number 29: 7239 observations,    complexity param=0.0004729695
+  mean=34.94788, MSE=5.764697 
+  left son=58 (3729 obs) right son=59 (3510 obs)
+  Primary splits:
+      wind_speed_10m  < 35.15        to the left,  improve=0.19643100, (0 missing)
+      wind_speed_100m < 51.65        to the left,  improve=0.09417986, (0 missing)
+      wind_gusts_10m  < 57.8         to the left,  improve=0.02710034, (0 missing)
+      sin_godzina     < 0.6035534    to the left,  improve=0.01222118, (0 missing)
+      wind_dir_cos    < 0.0348995    to the right, improve=0.01185420, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 51.65        to the left,  agree=0.703, adj=0.388, (0 split)
+      wind_gusts_10m  < 58.15        to the left,  agree=0.698, adj=0.377, (0 split)
+      precipitation   < 0.05         to the left,  agree=0.536, adj=0.043, (0 split)
+      cos_dzien       < 0.823923     to the left,  agree=0.536, adj=0.043, (0 split)
+      pressure_msl    < 1002.55      to the right, agree=0.534, adj=0.039, (0 split)
+
+Node number 30: 5130 observations,    complexity param=0.0008096966
+  mean=40.29078, MSE=8.796626 
+  left son=60 (2982 obs) right son=61 (2148 obs)
+  Primary splits:
+      wind_speed_10m  < 40.85        to the left,  improve=0.310971600, (0 missing)
+      wind_speed_100m < 58.55        to the left,  improve=0.238044700, (0 missing)
+      wind_gusts_10m  < 68.6         to the left,  improve=0.117434700, (0 missing)
+      pressure_msl    < 1009.35      to the right, improve=0.013383840, (0 missing)
+      wind_dir_cos    < 0.2334365    to the right, improve=0.008588301, (0 missing)
+  Surrogate splits:
+      wind_speed_100m < 59.05        to the left,  agree=0.833, adj=0.602, (0 split)
+      wind_gusts_10m  < 68.6         to the left,  agree=0.775, adj=0.464, (0 split)
+      wind_dir_sin    < -0.9999238   to the right, agree=0.588, adj=0.016, (0 split)
+      precipitation   < 0.95         to the left,  agree=0.585, adj=0.008, (0 split)
+      cos_dzien       < 0.9990371    to the left,  agree=0.584, adj=0.007, (0 split)
+
+Node number 31: 1276 observations,    complexity param=0.0008254064
+  mean=49.41685, MSE=23.44132 
+  left son=62 (913 obs) right son=63 (363 obs)
+  Primary splits:
+      wind_speed_10m       < 51.75        to the left,  improve=0.47826320, (0 missing)
+      wind_speed_100m      < 74.75        to the left,  improve=0.45809280, (0 missing)
+      wind_gusts_10m       < 90.9         to the left,  improve=0.36640720, (0 missing)
+      cos_dzien            < 0.7440764    to the left,  improve=0.05326642, (0 missing)
+      apparent_temperature < -2.75        to the right, improve=0.04354363, (0 missing)
+  Surrogate splits:
+      wind_speed_100m      < 74.75        to the left,  agree=0.947, adj=0.815, (0 split)
+      wind_gusts_10m       < 89.1         to the left,  agree=0.890, adj=0.614, (0 split)
+      pressure_msl         < 981.8        to the right, agree=0.723, adj=0.025, (0 split)
+      apparent_temperature < -14.65       to the right, agree=0.717, adj=0.006, (0 split)
+
+Node number 32: 4290 observations
+  mean=4.101492, MSE=4.590291 
+
+Node number 33: 6257 observations
+  mean=5.821304, MSE=4.150371 
+
+Node number 34: 6767 observations
+  mean=7.064209, MSE=3.773077 
+
+Node number 35: 8527 observations
+  mean=8.122728, MSE=3.282019 
+
+Node number 36: 9266 observations
+  mean=9.199158, MSE=3.441672 
+
+Node number 37: 9006 observations
+  mean=10.21265, MSE=3.414967 
+
+Node number 38: 10278 observations
+  mean=11.24725, MSE=3.131023 
+
+Node number 39: 10029 observations
+  mean=12.30567, MSE=3.155187 
+
+Node number 40: 10309 observations
+  mean=13.25619, MSE=3.175602 
+
+Node number 41: 10119 observations
+  mean=14.24179, MSE=3.087789 
+
+Node number 42: 10341 observations
+  mean=15.18304, MSE=3.092568 
+
+Node number 43: 9087 observations
+  mean=16.08891, MSE=2.973234 
+
+Node number 44: 9972 observations
+  mean=16.95106, MSE=3.119202 
+
+Node number 45: 8172 observations
+  mean=17.80193, MSE=2.973572 
+
+Node number 46: 11148 observations
+  mean=18.74796, MSE=3.241624 
+
+Node number 47: 8798 observations
+  mean=19.74311, MSE=3.018102 
+
+Node number 48: 7301 observations
+  mean=20.55607, MSE=3.058031 
+
+Node number 49: 11224 observations
+  mean=21.59424, MSE=3.150672 
+
+Node number 50: 9577 observations
+  mean=22.85471, MSE=3.18919 
+
+Node number 51: 7981 observations
+  mean=23.96827, MSE=3.187845 
+
+Node number 52: 6966 observations
+  mean=25.0593, MSE=3.289387 
+
+Node number 53: 7688 observations
+  mean=26.31258, MSE=3.495012 
+
+Node number 54: 5921 observations
+  mean=27.55068, MSE=3.377896 
+
+Node number 55: 6184 observations
+  mean=28.90703, MSE=3.568471 
+
+Node number 56: 5660 observations
+  mean=30.47663, MSE=3.917568 
+
+Node number 57: 4686 observations
+  mean=32.1643, MSE=3.712411 
+
+Node number 58: 3729 observations
+  mean=33.91547, MSE=4.514786 
+
+Node number 59: 3510 observations
+  mean=36.0447, MSE=4.757213 
+
+Node number 60: 2982 observations
+  mean=38.88706, MSE=5.535842 
+
+Node number 61: 2148 observations
+  mean=42.23953, MSE=6.79036 
+
+Node number 62: 913 observations
+  mean=47.30559, MSE=9.873956 
+
+Node number 63: 363 observations,    complexity param=0.0001474202
+  mean=54.727, MSE=18.15652 
+  left son=126 (304 obs) right son=127 (59 obs)
+  Primary splits:
+      wind_speed_100m < 84           to the left,  improve=0.38765890, (0 missing)
+      wind_speed_10m  < 56.85        to the left,  improve=0.38336770, (0 missing)
+      wind_gusts_10m  < 102.4        to the left,  improve=0.23746000, (0 missing)
+      cos_dzien       < 0.7204269    to the left,  improve=0.07298298, (0 missing)
+      wind_dir_cos    < 0.02617595   to the right, improve=0.06028886, (0 missing)
+  Surrogate splits:
+      wind_speed_10m < 58.25        to the left,  agree=0.981, adj=0.881, (0 split)
+      wind_gusts_10m < 104.95       to the left,  agree=0.876, adj=0.237, (0 split)
+      cos_dzien      < 0.9999259    to the left,  agree=0.846, adj=0.051, (0 split)
+
+Node number 126: 304 observations
+  mean=53.55822, MSE=9.923156 
+
+Node number 127: 59 observations
+  mean=60.74915, MSE=17.27436 
+

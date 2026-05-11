@@ -1,0 +1,2 @@
+"target","model","wariant","CP","liczba_lisci","glebokosc","MSE_train","RMSE_train","MAE_train","R2_train","MSE_test","RMSE_test","MAE_test","R2_test"
+"wind_gusts_10m_next","Drzewo 1SE","przyciete regula 1SE","0.000111209142077054",62,7,7.49856747213539,2.73835123242717,1.97100706383793,0.963066508459246,10.0035126270017,3.16283300649934,2.24829039326802,0.940617464399434
