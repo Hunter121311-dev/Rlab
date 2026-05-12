@@ -1,0 +1,644 @@
+---
+title: "Polisy — porównanie odsetków szkód"
+author: "Materiały do laboratorium — Język R / Data Science"
+date: "`r format(Sys.Date(), '%d.%m.%Y')`"
+subtitle: "Wersja studencka do samodzielnego uzupełnienia"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    fig_width: 7
+    fig_height: 4.5
+  word_document:
+    toc: true
+    toc_depth: 3
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  dpi       = 110
+)
+
+options(scipen = 999, digits = 4)
+```
+
+# Cel ćwiczenia
+
+W tym ćwiczeniu wykonujemy kompletną, ale skróconą analizę danych z
+wykorzystaniem **testu niezależności** **chi-kwadrat** oraz, pomocniczo,
+**dokładnego testu Fishera**.
+
+Zajęcia dotyczą przede wszystkim języka R, dlatego najważniejsze jest
+przećwiczenie pełnej ścieżki programistycznej:
+
+1.  wczytanie danych,
+2.  przygotowanie zmiennych,
+3.  utworzenie tabeli liczności,
+4.  obliczenie procentów w grupach,
+5.  wykonanie wykresu dla danych nominalnych,
+6.  wykonanie testu chi-kwadrat,
+7.  sprawdzenie liczebności oczekiwanych,
+8.  interpretacja porównania wyniku z testem Fishera,
+9.  sformułowanie krótkiego wniosku.
+
+Przy okazji powtarzamy podstawową logikę analizy statystycznej dla
+zmiennych nominalnych: najpierw tworzymy tabelę wielodzielczą, potem
+sprawdzamy odsetki, a dopiero później wykonujemy test istotności.
+
+# Opis problemu badawczego
+
+W analizowanym przykładzie chcemy sprawdzić, czy odsetek polis ze szkodą
+różni się pomiędzy kobietami i mężczyznami.
+
+Dla każdej polisy mamy informację, czy wystąpiła szkoda oraz jakiej płci
+był kierowca. Interesuje nas więc zależność pomiędzy dwiema zmiennymi
+nominalnymi.
+
+Pytanie badawcze brzmi:
+
+> Czy wystąpienie szkody jest powiązane z płcią kierowcy?
+
+# Zmienne w analizie
+
+| Zmienna w badaniu  | Rola w analizie               | Typ zmiennej          |
+|--------------------|-------------------------------|-----------------------|
+| wystąpienie szkody | zmienna analizowana (zależna) | nominalna, 2 warianty |
+| płeć kierowcy      | zmienna grupująca             | nominalna, 2 warianty |
+
+Ponieważ porównujemy odsetki wystąpienia szkody w dwóch niezależnych
+grupach, odpowiednim kandydatem jest **test niezależności chi-kwadrat**
+. Dla tabel 2 × 2 można dodatkowo rozważyć **poprawkę Yatesa** albo
+**dokładny test Fishera**.
+
+# Przygotowanie środowiska
+
+## Instalacja pakietów
+
+Poniższy kod należy uruchomić tylko wtedy, gdy któryś z pakietów nie
+jest jeszcze zainstalowany.
+
+```{r install-packages, eval = FALSE}
+install.packages(c(
+  "tidyverse",  # praca z danymi i wykresy
+  "broom",      # porządkowanie wyników testów
+  "knitr",      # estetyczne tabele w R Markdown
+  "scales"      # formatowanie osi procentowych
+))
+```
+
+## Wczytanie bibliotek
+
+```{r load-libraries}
+library(tidyverse)
+library(broom)
+library(knitr)
+library(scales)
+```
+
+## Parametry analizy
+
+Poziom istotności zapisujemy w osobnym obiekcie. Dzięki temu, gdybyśmy
+chcieli zmienić poziom istotności, robimy to tylko w jednym miejscu.
+
+```{r analysis-parameters}
+alpha <- 0.05
+```
+
+# Wczytanie danych
+
+Zakładamy, że plik `Polisy.csv` znajduje się w tym samym folderze co
+plik RMD.
+
+```{r read-data}
+data_file <- "Polisy.csv"
+
+if (!file.exists(data_file)) {
+  stop("Nie znaleziono pliku Polisy.csv w bieżącym folderze roboczym.")
+}
+
+raw_data <- readr::read_delim(
+  file = data_file,
+  delim = ";",
+  locale = readr::locale(decimal_mark = ","),
+  trim_ws = TRUE,
+  show_col_types = FALSE
+)
+```
+
+# Przygotowanie danych
+
+W pliku źródłowym kolumny mają polskie nazwy. W danych nie jest to
+problemem, ale w kodzie wygodniej używać prostych nazw roboczych.
+Dlatego tworzymy nową ramkę danych z nazwami:
+
+- `claim` - wystąpienie szkody,
+- `sex` - płeć kierowcy,
+- `driver_age` - wiek kierowcy,
+- `vehicle_age` - czas eksploatacji pojazdu.
+
+W tej analizie wykorzystujemy tylko dwie pierwsze zmienne.
+
+```{r clean-data}
+policy_data <- raw_data
+
+names(policy_data) <- c(
+  "claim",
+  "sex",
+  "driver_age",
+  "vehicle_age"
+)
+
+policy_data <- policy_data |>
+  dplyr::mutate(
+    claim = factor(claim, levels = c("Nie", "Tak")),
+    sex = factor(
+      sex,
+      levels = c("Kobieta", "Mezczyzna"),
+      labels = c("Kobieta", "Mężczyzna")
+    ),
+    driver_age = as.numeric(driver_age),
+    vehicle_age = as.numeric(vehicle_age)
+  ) |>
+  tidyr::drop_na(claim, sex)
+```
+
+> **Dobra praktyka programistyczna**\
+> W kodzie R warto unikać polskich znaków w nazwach obiektów i kolumn
+> roboczych. Dane mogą mieć polskie etykiety, ale kod jest zwykle
+> stabilniejszy i czytelniejszy, gdy używamy prostych nazw technicznych.
+
+# Kontrola danych
+
+## Struktura ramki danych
+
+Sprawdź strukturę przygotowanej ramki danych `policy_data`. Zwróć uwagę
+przede wszystkim na zmienne `claim` oraz `sex`, ponieważ to one będą
+wykorzystane w tabeli kontyngencji i w teście chi-kwadrat.
+
+```{r data-structure}
+glimpse(policy_data)
+```
+
+W danych znajdują się dwie kategorie zmiennej `sex` oraz dwie kategorie
+zmiennej `claim`. Oznacza to, że podstawą analizy będzie tabela 2 × 2.
+
+# Definicja problemu statystycznego
+
+Interesuje nas zależność:
+
+``` text
+claim ~ sex
+```
+
+czyli sprawdzamy, czy wystąpienie szkody jest powiązane z płcią
+kierowcy.
+
+Hipotezy dla testu chi-kwadrat niezależności są następujące:
+
+**Hipoteza zerowa H0:**
+
+> Wystąpienie szkody jest niezależne od płci kierowcy.
+
+**Hipoteza alternatywna H1:**
+
+> Wystąpienie szkody nie jest niezależne od płci kierowcy.
+
+W praktyce hipoteza alternatywna oznacza, że odsetek polis ze szkodą
+różni się pomiędzy kobietami i mężczyznami.
+
+# Wybór testu
+
+W tym przykładzie porównujemy dwie zmienne nominalne: wystąpienie szkody
+(`claim`) oraz płeć (`sex`). Podstawowym narzędziem do oceny zależności
+między dwiema zmiennymi nominalnymi jest test niezależności chi-kwadrat
+Pearsona.
+
+Przed jego zastosowaniem należy jednak sprawdzić liczebności oczekiwane
+w komórkach tabeli. W prostym wariancie dydaktycznym można przyjąć
+regułę, że każda liczebność oczekiwana powinna być większa od 5. Jeżeli
+liczebności oczekiwane byłyby zbyt małe, należałoby rozważyć dokładny
+test Fishera.
+
+Jak pokażemy w dalszej części analizy wszystkie liczebności oczekiwane
+są większe od 5, a najmniejsza wynosi około 17,55. Dlatego jako główny
+test wybieramy klasyczny test chi-kwadrat Pearsona bez poprawki.
+
+Dla tabel 2 × 2 można spotkać również test chi-kwadrat z poprawką Yatesa
+(`correct = TRUE`). Poprawka ta miała ograniczać niedokładność
+przybliżenia chi-kwadrat w małych tabelach, ale jest dość
+konserwatywna - często podnosi wartość p i utrudnia uzyskanie istotności
+statystycznej. Obecnie przy bardzo małych liczebnościach częściej
+rozważa się dokładny test Fishera.
+
+W tym ćwiczeniu wynik testu chi-kwadrat Pearsona traktujemy jako wynik
+główny, natomiast test z poprawką Yatesa i dokładny test Fishera
+pokazujemy pomocniczo, aby zobaczyć, jak wybór procedury może wpływać na
+wartość p.
+
+**Dla zainteresowanych:** W przypadku tabel 2 × 2 można spotkać także
+tzw. podejście mid-p. Jest to mniej konserwatywna modyfikacja dokładnego
+testu Fishera, zwykle dająca niższe wartości p niż klasyczny test
+Fishera. Można ją traktować jako wariant pośredni między testem Fishera
+a przybliżonym testem chi-kwadrat. W tym materiale pozostajemy jednak
+przy standardowych procedurach dostępnych bezpośrednio w R: teście
+chi-kwadrat Pearsona, jego wersji z poprawką Yatesa oraz dokładnym
+teście Fishera.
+
+# Tabela wielodzielcza (kontyngencji)
+
+Tworzymy tabelę wielodzielczą, w której wiersze odpowiadają wystąpieniu
+szkody, a kolumny płci kierowcy.
+
+Utwórz tabelę kontyngencji pokazującą liczebności polis według dwóch
+zmiennych nominalnych: wystąpienia szkody (`claim`) oraz płci kierowcy
+(`sex`). Tabela kontyngencji jest podstawą dalszej analizy -
+wykorzystamy ją zarówno do prezentacji liczebności, jak i do wykonania
+testu chi-kwadrat.
+
+Wskazówka: użyj funkcji `table()`. Wynik zapisz w obiekcie
+`contingency_table`.
+
+```{r contingency-table}
+contingency_table <- table(policy_data$claim, policy_data$sex)
+contingency_table
+```
+
+Tę samą tabelę można pokazać w bardziej raportowej formie.
+
+**Uwaga!** Poniższy fragment zadziała poprawnie tylko wtedy, gdy w
+poprzednim kroku utworzono obiekt `contingency_table`.
+
+```{r contingency-table-kable}
+as.data.frame.matrix(contingency_table) |>
+  knitr::kable(caption = "Tabela liczności: szkoda według płci kierowcy")
+```
+
+## Procenty w kolumnach
+
+Aby porównać odsetek szkód pomiędzy kobietami i mężczyznami, najbardziej
+przydatne są procenty liczone **w kolumnach**, czyli osobno w grupie
+kobiet i osobno w grupie mężczyzn.
+
+Oblicz procenty kolumnowe w tabeli kontyngencji. W tym przykładzie
+interesuje nas, jaki odsetek kobiet i jaki odsetek mężczyzn miał szkodę.
+Procenty kolumnowe liczymy osobno w obrębie każdej kolumny, czyli osobno
+dla każdej płci. Dzięki temu możemy porównać częstość występowania
+szkody w grupie kobiet i w grupie mężczyzn.
+
+Wskazówka: użyj funkcji `prop.table()` dla obiektu `contingency_table`.
+Argument `margin = 2` oznacza obliczanie proporcji w kolumnach. Wynik
+pomnóż przez 100 i zapisz w obiekcie `column_percentages`.
+
+```{r column-percentages}
+column_percentages <- 100*prop.table(contingency_table, margin = 2) |> round(3)
+column_percentages
+```
+
+Wśród kobiet szkoda wystąpiła w około 12,8% polis, natomiast wśród
+mężczyzn w około 22,9% polis. Na poziomie opisowym szkody występowały
+więc częściej w grupie mężczyzn.
+
+## Procenty w wierszach
+
+Procenty w wierszach odpowiadają na inne pytanie: jaki jest udział
+kobiet i mężczyzn wśród polis bez szkody oraz wśród polis ze szkodą. Nie
+jest to główna informacja dla naszego pytania badawczego, ale warto
+zobaczyć różnicę między procentami wierszowymi i kolumnowymi.
+
+Analogicznie oblicz procenty wierszowe w tabeli kontyngencji. Tym razem
+proporcje liczymy osobno w obrębie każdego wiersza, czyli osobno dla
+polis bez szkody i polis ze szkodą.
+
+Wskazówka: użyj ponownie funkcji `prop.table()`, ale tym razem ustaw
+odpowiedni argument `margin`, aby procenty sumowały się w wierszach.
+
+```{r row-percentages}
+row_percentages <- 100*prop.table(contingency_table, margin = 1) |> round(3)
+row_percentages
+```
+
+# Wykres udziałów procentowych
+
+Wykres skumulowanych udziałów procentowych pozwala szybko porównać
+strukturę szkód w grupach kobiet i mężczyzn.
+
+Przygotuj wykres słupkowy pokazujący udział polis ze szkodą i bez szkody
+osobno dla kobiet i mężczyzn.
+
+Wykres powinien pokazywać **proporcje**, a nie surowe liczebności.
+Dzięki temu łatwiej porównać odsetek szkód między grupami, nawet jeśli
+liczebności kobiet i mężczyzn są różne.
+
+Wskazówka: możesz użyć funkcji z pakietu `ggplot2`, np. `ggplot()`,
+`aes()`, `geom_bar()` oraz argumentu `position = "fill"`. Do pokazania
+osi Y jako procentów możesz wykorzystać `scales::percent_format()`.
+
+```{r stacked-bar-chart}
+ggplot(data = column_percentages, aes(x)) +
+  geom_bar(position = "fill") +
+  scales::percent_format()
+```
+
+Interpretacja wykresu: udział polis ze szkodą jest większy w grupie
+mężczyzn niż w grupie kobiet. Różnica jest widoczna opisowo, ale do
+oceny istotności statystycznej potrzebny jest test.
+
+# Test chi-kwadrat niezależności
+
+## Test Pearsona bez poprawki Yatesa
+
+Najpierw wykonujemy klasyczny test chi-kwadrat Pearsona bez poprawki
+Yatesa.
+
+Wykonaj test niezależności chi-kwadrat Pearsona dla tabeli
+`contingency_table`.
+
+W tym przykładzie jako główny test stosujemy wersję bez poprawki Yatesa,
+ponieważ (jak sprawdzimy poniżej) liczebności oczekiwane są
+wystarczająco duże.
+
+Wskazówka: użyj funkcji `chisq.test()`. Aby wykonać klasyczny test
+Pearsona bez poprawki Yatesa, ustaw argument `correct = FALSE`. Wynik
+zapisz w obiekcie `chi_square_result`.
+
+```{r chi-square-test}
+```
+
+Wynik klasycznego testu chi-kwadrat Pearsona wynosi:
+
+**χ²(1) = 4,08; p = 0,0435.**
+
+Na poziomie istotności α = 0,05 wynik ten wskazuje na statystycznie
+istotną zależność pomiędzy płcią kierowcy a wystąpieniem szkody.
+
+## Sprawdzenie liczebności oczekiwanych
+
+Test chi-kwadrat wymaga, aby liczebności oczekiwane w komórkach tabeli
+nie były zbyt małe. Często stosowana praktyczna reguła mówi, że
+liczebności oczekiwane powinny być większe od 5.
+
+**Uwaga!** Poniższy fragment korzysta z obiektu \`chi_square_result\`,
+który powinien powstać w poprzednim kroku.
+
+```{r expected-counts}
+expected_counts <- chi_square_result$expected
+
+expected_counts
+
+expected_counts > 5
+```
+
+Wszystkie liczebności oczekiwane są większe od 5. Oznacza to, że
+spełniona jest praktyczna reguła pozwalająca zastosować test chi-kwadrat
+Pearsona. Dlatego w tej analizie **test chi-kwadrat Pearsona traktujemy
+jako główny test istotności**.
+
+Dokładny test Fishera pokażemy dodatkowo, ale nie dlatego, że test
+chi-kwadrat jest tutaj niedozwolony. Fisher będzie pełnił rolę
+porównania pomocniczego dla tabeli 2 × 2.
+
+## Test chi-kwadrat z poprawką Yatesa
+
+Dla tabel 2 × 2 funkcja `chisq.test()` w R domyślnie stosuje poprawkę
+Yatesa. Poprawka ta jest bardziej konserwatywna, czyli zwykle daje
+większą wartość p. W tym ćwiczeniu pokazujemy ją jako wariant
+porównawczy, aby studenci zobaczyli, że przy wynikach bliskich granicy
+0,05 wybór wariantu testu może mieć znaczenie.
+
+Dla porównania wykonaj test chi-kwadrat z poprawką Yatesa. Wykorzystaj
+ten sam obiekt `contingency_table`, ale tym razem ustaw argument
+`correct = TRUE`. Wynik zapisz w obiekcie `chi_square_yates_result`.
+
+```{r chi-square-yates}
+```
+
+Wynik testu z poprawką Yatesa wynosi:
+
+**χ²(1) = 3,48; p = 0,0622.**
+
+W tym wariancie wynik nie osiąga klasycznego progu istotności
+statystycznej α = 0,05. Nie zmienia to wcześniejszej decyzji o wyborze
+podstawowego testu, bo liczebności oczekiwane były wystarczające dla
+testu chi-kwadrat Pearsona. Pokazuje jednak, że wynik jest graniczny i
+należy interpretować go ostrożnie.
+
+## Dokładny test Fishera
+
+Ponieważ analizujemy tabelę 2 × 2, możemy dodatkowo wykonać dokładny
+test Fishera. Test Fishera jest szczególnie zalecany wtedy, gdy
+liczebności oczekiwane są małe. W tym przykładzie nie ma takiej
+konieczności, ale wynik Fishera może stanowić pomocnicze porównanie z
+testem chi-kwadrat.
+
+```{r fisher-test}
+fisher_result <- fisher.test(contingency_table)
+
+fisher_result
+```
+
+Wynik dokładnego testu Fishera wynosi:
+
+**p = 0,0457.**
+
+W tym wariancie wynik jest istotny statystycznie na poziomie α = 0,05. W
+tym przykładzie prowadzi do takiej samej decyzji statystycznej jak
+klasyczny test chi-kwadrat Pearsona bez poprawki.
+
+# Porównanie wyników testów
+
+Zestawmy trzy warianty testowania w jednej tabeli.
+
+**Uwaga!** Poniższe zestawienie zadziała poprawnie, jeżeli wcześniej
+utworzono obiekty `chi_square_result`, `chi_square_yates_result` oraz
+`fisher_result`.
+
+```{r test-comparison-table}
+test_comparison <- tibble::tibble(
+  test = c(
+    "Chi-kwadrat Pearsona bez poprawki",
+    "Chi-kwadrat z poprawką Yatesa",
+    "Dokładny test Fishera"
+  ),
+  statistic = c(
+    unname(chi_square_result$statistic),
+    unname(chi_square_yates_result$statistic),
+    NA_real_
+  ),
+  p_value = c(
+    chi_square_result$p.value,
+    chi_square_yates_result$p.value,
+    fisher_result$p.value
+  )
+) |>
+  dplyr::mutate(
+    statistic = round(statistic, 4),
+    p_value = round(p_value, 4)
+  )
+
+test_comparison |>
+  knitr::kable(caption = "Porównanie wyników testów dla tabeli 2 × 2")
+```
+
+Na podstawie sprawdzenia liczebności oczekiwanych jako główny wynik
+raportujemy test chi-kwadrat Pearsona bez poprawki. Ten test wskazuje na
+istotną statystycznie zależność pomiędzy płcią kierowcy a wystąpieniem
+szkody. Dokładny test Fishera prowadzi do podobnego wniosku.
+
+Wariant z poprawką Yatesa jest bardziej konserwatywny i w tym
+przykładzie nie osiąga poziomu istotności 0,05. Dlatego wniosek końcowy
+powinien zawierać informację, że wynik jest blisko granicy istotności i
+że siła zależności jest niewielka.
+
+# Miary opisujące siłę zależności
+
+## Różnica odsetków, ryzyko względne i iloraz szans
+
+Sama wartość p nie mówi, jak duża jest różnica. Dlatego warto obliczyć
+proste miary opisowe: odsetki szkód w grupach, różnicę odsetków, ryzyko
+względne oraz iloraz szans.
+
+**Ryzyko** oznacza tutaj prawdopodobieństwo wystąpienia szkody w danej
+grupie. **Ryzyko względne** jest stosunkiem dwóch ryzyk, czyli mówi, ile
+razy większe jest prawdopodobieństwo szkody w jednej grupie niż w
+drugiej.
+
+**Szansa** to stosunek liczby zdarzeń do liczby braku zdarzeń, np.
+liczby polis ze szkodą do liczby polis bez szkody. **Iloraz szans**
+porównuje szanse w dwóch grupach. W praktyce iloraz szans jest często
+mniej intuicyjny niż ryzyko względne, ale jest bardzo często stosowany w
+analizie tabel 2 × 2 oraz w regresji logistycznej.
+
+```{r descriptive-effect-measures}
+risk_women <- contingency_table["Tak", "Kobieta"] / sum(contingency_table[, "Kobieta"])
+risk_men <- contingency_table["Tak", "Mężczyzna"] / sum(contingency_table[, "Mężczyzna"])
+
+risk_difference <- risk_men - risk_women
+risk_ratio <- risk_men / risk_women
+odds_ratio_damage <-
+  (contingency_table["Tak", "Mężczyzna"] / contingency_table["Nie", "Mężczyzna"]) /
+  (contingency_table["Tak", "Kobieta"] / contingency_table["Nie", "Kobieta"])
+
+effect_measures <- tibble::tibble(
+  measure = c(
+    "Odsetek szkód — kobiety",
+    "Odsetek szkód — mężczyźni",
+    "Różnica odsetków: mężczyźni - kobiety",
+    "Ryzyko względne: mężczyźni / kobiety",
+    "Iloraz szans: mężczyźni / kobiety"
+  ),
+  value = c(
+    risk_women,
+    risk_men,
+    risk_difference,
+    risk_ratio,
+    odds_ratio_damage
+  )
+)
+
+effect_measures |>
+  dplyr::mutate(value = round(value, 4)) |>
+  knitr::kable(caption = "Miary opisujące różnicę odsetków szkód")
+```
+
+Odsetek szkód był o około 10,1 punktu procentowego wyższy w grupie
+mężczyzn niż w grupie kobiet. Ryzyko wystąpienia szkody było około 1,79
+razy większe w grupie mężczyzn niż w grupie kobiet. Mówiąc prościej: w
+tych danych prawdopodobieństwo szkody w grupie mężczyzn było około 79%
+wyższe niż w grupie kobiet.
+
+Iloraz szans wyniósł około 2,03. Oznacza to, że szansa wystąpienia
+szkody w relacji do braku szkody była około dwa razy większa w grupie
+mężczyzn niż w grupie kobiet. Warto podkreślić, że iloraz szans nie jest
+tym samym co ryzyko względne: porównuje szanse, a nie bezpośrednio
+prawdopodobieństwa.
+
+## V Cramera
+
+Dla tabeli wielodzielczej można też obliczyć V Cramera, czyli miarę siły
+zależności pomiędzy zmiennymi nominalnymi. V Cramera bazuje na
+statystyce chi-kwadrat, ale przekształca ją do skali łatwiejszej do
+interpretacji jako miara siły powiązania między zmiennymi.
+
+Wartość V Cramera mieści się w przedziale od 0 do 1. Wartość bliska 0
+oznacza bardzo słabe powiązanie, a wartość bliższa 1 oznacza silniejsze
+powiązanie. Dla tabeli 2 × 2 V Cramera jest równoważne współczynnikowi
+phi.
+
+```{r cramers-v}
+chi_square_statistic <- unname(chi_square_result$statistic)
+n_total <- sum(contingency_table)
+min_dimension <- min(dim(contingency_table)) - 1
+
+cramers_v <- sqrt(chi_square_statistic / (n_total * min_dimension))
+
+cramers_v
+```
+
+Wartość V Cramera wynosi około 0,11. Jest to mała wielkość efektu.
+Oznacza to, że zależność pomiędzy płcią kierowcy a wystąpieniem szkody
+jest słaba. To ważne uzupełnienie wartości p: test może wskazywać na
+statystyczną istotność zależności, ale sama siła powiązania między
+zmiennymi pozostaje niewielka.
+
+# Końcowy wniosek
+
+W analizowanych danych szkoda występowała częściej wśród mężczyzn niż
+wśród kobiet. Odsetek polis ze szkodą wyniósł około 22,9% w grupie
+mężczyzn i około 12,8% w grupie kobiet.
+
+Po sprawdzeniu liczebności oczekiwanych jako główny test zastosowano
+test chi-kwadrat Pearsona bez poprawki. Test ten wskazał na istotną
+statystycznie zależność pomiędzy płcią kierowcy a wystąpieniem szkody:
+**χ²(1) = 4,08; p = 0,0435**. Podobny wniosek dał dokładny test Fishera
+(**p = 0,0457**).
+
+Jednocześnie test chi-kwadrat z poprawką Yatesa dał wynik nieistotny
+statystycznie na poziomie α = 0,05 (**p = 0,0622**). Wniosek należy więc
+sformułować ostrożnie: dane sugerują, że szkody występowały częściej w
+polisach mężczyzn niż kobiet, ale wynik znajduje się blisko granicy
+istotności.
+
+Ryzyko wystąpienia szkody było około 1,79 razy większe w grupie
+mężczyzn, a iloraz szans wyniósł około 2,03. Jednocześnie wielkość
+efektu mierzona V Cramera była mała (**V Cramera ≈ 0,11**), dlatego siłę
+związku między płcią kierowcy a wystąpieniem szkody należy uznać za
+słabą.
+
+# Najczęstsze błędy w tej analizie
+
+1.  **Mylenie procentów kolumnowych z wierszowymi**\
+    Jeżeli pytamy o odsetek szkód w grupie kobiet i mężczyzn,
+    najważniejsze są procenty liczone w kolumnach, czyli osobno w każdej
+    grupie płci.
+
+2.  **Ignorowanie liczebności oczekiwanych**\
+    Test chi-kwadrat wymaga sprawdzenia liczebności oczekiwanych. Jeśli
+    są zbyt małe, należy rozważyć dokładny test Fishera. W tym
+    przykładzie wszystkie liczebności oczekiwane są większe od 5, więc
+    test chi-kwadrat Pearsona może być użyty jako główny test.
+
+3.  **Nieświadome uwzględnienie poprawki Yatesa w tabeli 2 × 2**\
+    W R funkcja `chisq.test()` dla tabel 2 × 2 domyślnie stosuje
+    poprawkę Yatesa. Warto świadomie zdecydować, czy raportujemy wynik z
+    poprawką, bez poprawki, czy pokazujemy oba warianty.
+
+4.  **Uznanie wartości p za miarę siły efektu**\
+    Wartość p mówi o zgodności danych z hipotezą zerową, ale nie mówi
+    bezpośrednio, jak silna jest zależność. Do tego służą miary takie
+    jak różnica odsetków, ryzyko względne, iloraz szans albo V Cramera.

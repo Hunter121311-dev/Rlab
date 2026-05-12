@@ -1,0 +1,448 @@
+---
+title: "Czas reakcji przed i po spożyciu alkoholu"
+subtitle: "Test t-Studenta dla prób zależnych — wersja studencka do uzupełienia"
+author: "Materiały dydaktyczne"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    fig_width: 7
+    fig_height: 4.5
+  word_document:
+    toc: true
+    toc_depth: 3
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  dpi       = 110
+)
+```
+
+# Cel analizy
+
+W tym przykładzie analizujemy czasy reakcji tej samej grupy 25 kierowców
+przed oraz po wypiciu 100 g alkoholu. Naszym zadaniem jest sprawdzenie,
+czy przeciętny czas reakcji po alkoholu różni się od przeciętnego czasu
+reakcji przed alkoholem.
+
+Ponieważ te same osoby zostały zmierzone dwukrotnie, mamy do czynienia z
+**próbami zależnymi**. W takiej sytuacji nie porównujemy dwóch
+niezależnych grup, ale analizujemy zmianę wyniku w parach pomiarów:
+przed i po.
+
+Hipotezy statystyczne można zapisać następująco:
+
+- H0: średnia różnica czasu reakcji po i przed alkoholem wynosi 0,
+- H1: średnia różnica czasu reakcji po i przed alkoholem jest różna od
+  0.  
+
+# Przygotowanie środowiska
+
+```{r install-packages, eval=FALSE}
+install.packages(c(
+  "tidyverse",
+  "janitor",
+  "broom",
+  "knitr"
+))
+```
+
+```{r load-libraries}
+library(tidyverse)
+library(janitor)
+library(broom)
+library(knitr)
+```
+
+```{r analysis-parameters}
+alpha <- 0.05
+```
+
+# Import danych
+
+Dane znajdują się w pliku `Czas reakcji.csv`. Plik zawiera dwa pomiary
+dla każdego kierowcy:
+
+- `Reakcja_przed` - czas reakcji przed spożyciem alkoholu,
+- `Reakcja_po` - czas reakcji po spożyciu alkoholu.
+
+```{r read-data}
+raw_data <- readr::read_delim(
+  file = "Czas reakcji.csv",
+  delim = ";",
+  locale = readr::locale(decimal_mark = ",", encoding = "UTF-8"),
+  show_col_types = FALSE
+)
+
+head(raw_data)
+```
+
+# Przygotowanie danych
+
+Porządkujemy nazwy zmiennych i tworzymy dodatkową zmienną
+`reaction_diff`, czyli różnicę między czasem reakcji po alkoholu i przed
+alkoholem.
+
+Dodatnia wartość `reaction_diff` oznacza, że czas reakcji po alkoholu
+był dłuższy niż przed alkoholem.
+
+```{r clean-data}
+reaction_data <- raw_data |>
+  janitor::clean_names() |>
+  dplyr::rename(
+    reaction_before = reakcja_przed,
+    reaction_after  = reakcja_po
+  ) |>
+  dplyr::mutate(
+    driver_id = dplyr::row_number(),
+    reaction_diff = reaction_after - reaction_before
+  ) |>
+  tidyr::drop_na(reaction_before, reaction_after, reaction_diff)
+
+head(reaction_data)
+```
+
+# Wybór testu
+
+W tym przykładzie porównujemy dwa pomiary wykonane u tych samych osób:
+czas reakcji przed spożyciem alkoholu oraz czas reakcji po spożyciu
+alkoholu. Nie są to więc dwie niezależne grupy, tylko **dwa powiązane
+pomiary** tej samej grupy kierowców.
+
+Z tego powodu właściwym testem parametrycznym jest **test t-Studenta dla
+prób zależnych**. W praktyce taki test nie analizuje dwóch kolumn
+całkowicie oddzielnie, lecz sprawdza, czy średnia różnica między
+pomiarem po i przed alkoholem różni się od zera.
+
+W tej analizie różnicę definiujemy jako:
+
+$$\text{reaction_diff} = \text{reaction_after} - \text{reaction_before}$$
+
+Dodatnia wartość różnicy oznacza wydłużenie czasu reakcji po spożyciu
+alkoholu. Ujemna wartość oznaczałaby krótszy czas reakcji po alkoholu.
+
+Przed wykonaniem testu t dla prób zależnych sprawdzimy normalność
+rozkładu różnic. Jeżeli rozkład różnic silnie odbiegałby od normalnego,
+można byłoby rozważyć nieparametryczny test Wilcoxona dla prób
+zależnych. W tym materiale główną procedurą pozostaje jednak test
+t-Studenta dla prób zależnych.
+
+# Kontrola struktury danych
+
+Sprawdź strukturę przygotowanej ramki danych `reaction_data`. Zwróć
+uwagę, czy kolumny `reaction_before` i `reaction_after` są zmiennymi
+liczbowymi oraz czy została poprawnie utworzona kolumna z różnicą
+`reaction_diff`.
+
+```{r data-structure}
+dplyr::glimpse(reaction_data)
+```
+
+W danych znajduje się 25 kompletnych par pomiarów. Każdy wiersz
+odpowiada jednemu kierowcy.
+
+Sprawdź, ile osób znajduje się w analizowanym zbiorze danych. Każdy
+wiersz odpowiada jednemu kierowcy, u którego zmierzono czas reakcji
+przed i po spożyciu alkoholu.
+
+```{r sample-size}
+nrow(reaction_data)
+length(unique(reaction_data$driver_id))
+```
+
+# Statystyki opisowe
+
+Najpierw porównujemy średnie i odchylenia standardowe czasu reakcji
+przed oraz po spożyciu alkoholu.
+
+Oblicz podstawowe statystyki opisowe dla czasu reakcji przed alkoholem,
+po alkoholu oraz dla różnicy `reaction_diff`. W danych zależnych różnica
+między pomiarami jest bardzo ważna, ponieważ to właśnie ona jest później
+analizowana w teście t dla prób zależnych.
+
+```{r descriptive-statistics-wide}
+descriptive_summary <- reaction_data |>
+  dplyr::summarise(
+    n = dplyr::n(),
+    mean_before = mean(reaction_before),
+    sd_before = sd(reaction_before),
+    median_before = median(reaction_before),
+    mean_after = mean(reaction_after),
+    sd_after = sd(reaction_after),
+    median_after = median(reaction_after),
+    mean_difference = mean(reaction_diff),
+    sd_difference = sd(reaction_diff),
+    median_difference = median(reaction_diff)
+  )
+
+descriptive_summary |>
+  knitr::kable(
+    digits = 4,
+    caption = "Statystyki opisowe czasów reakcji przed i po alkoholu"
+  )
+```
+
+Średni czas reakcji przed spożyciem alkoholu wynosi około 0,201 s,
+natomiast po spożyciu alkoholu około 0,269 s. Średnia różnica wynosi
+około 0,068 s, co oznacza wydłużenie czasu reakcji po alkoholu.
+
+# Dane w formacie długim
+
+Do wygodnego tworzenia wykresów przekształcimy dane z formatu szerokiego
+do formatu długiego.
+
+Poniższy fragment przekształca dane z układu szerokiego do długiego.
+Dzięki temu łatwiej przygotować wykresy porównujące czasy reakcji przed
+i po spożyciu alkoholu. Kod zostawiamy gotowy, ponieważ jest to krok
+techniczny związany głównie z przygotowaniem danych do wizualizacji.
+
+```{r long-data}
+reaction_long <- reaction_data |>
+  dplyr::select(driver_id, reaction_before, reaction_after) |>
+  tidyr::pivot_longer(
+    cols = c(reaction_before, reaction_after),
+    names_to = "measurement",
+    values_to = "reaction_time"
+  ) |>
+  dplyr::mutate(
+    measurement = dplyr::recode(
+      measurement,
+      reaction_before = "Przed alkoholem",
+      reaction_after  = "Po alkoholu"
+    ),
+    measurement = factor(
+      measurement,
+      levels = c("Przed alkoholem", "Po alkoholu")
+    )
+  )
+
+head(reaction_long)
+```
+
+# Wizualizacja danych
+
+Dla danych zależnych szczególnie użyteczny jest wykres, na którym
+połączymy pomiary tej samej osoby. Dzięki temu widzimy, czy większość
+kierowców ma dłuższy czas reakcji po alkoholu.
+
+Kod zostawiamy gotowy, ponieważ głównym celem ćwiczenia jest wykonanie
+testu t dla prób zależnych, a nie samodzielne przygotowanie bardziej
+złożonego wykresu.
+
+```{r paired-line-plot}
+ggplot(reaction_long, aes(x = measurement, y = reaction_time, group = driver_id)) +
+  geom_line(alpha = 0.45) +
+  geom_point(size = 2, alpha = 0.75) +
+  labs(
+    title = "Czas reakcji przed i po alkoholu",
+    x = "Moment pomiaru",
+    y = "Czas reakcji [s]"
+  ) +
+  theme_minimal()
+```
+
+Na wykresie widać, że u większości kierowców czas reakcji po alkoholu
+jest dłuższy niż przed alkoholem.
+
+Dodatkowo można porównać rozkłady obu pomiarów za pomocą wykresu
+ramka-wąsy. Trzeba jednak pamiętać, że taki wykres nie pokazuje
+bezpośrednio parowania obserwacji, dlatego w danych typu przed-po wykres
+połączonych par jest zwykle bardziej informacyjny.
+
+Przygotuj wykres ramka-wąsy pokazujący rozkłady zmiennej `reaction_time`
+w grupach wyznaczonych przez `measurement`. Dodaj pojedyncze obserwacje
+jako punkty.
+
+```{r boxplot-before-after}
+ggplot(reaction_long, aes(x = measurement, y = reaction_time)) +
+  geom_boxplot(
+    width = 0.45,
+    outlier.shape = NA
+  ) +
+  geom_jitter(
+    width = 0.1,
+    size = 2,
+    alpha = 1
+  ) +
+  labs(
+    title = "Rozkład czasów reakcji przed i po alkoholu",
+    x = "Moment pomiaru",
+    y = "Czas reakcji [s]"
+  ) +
+  theme_minimal()
+```
+
+# Ocena normalności rozkładu różnic
+
+W przypadku testu t dla prób zależnych założenie normalności dotyczy
+przede wszystkim **rozkładu różnic**, a nie oddzielnie rozkładu obu
+pomiarów.
+
+Wykonaj test Shapiro-Wilka dla zmiennej `reaction_diff`. Wynik zapisz w
+obiekcie `shapiro_result`.
+
+## Test Shapiro-Wilka dla różnic
+
+```{r shapiro-test-differences}
+shapiro.test(reaction_data$reaction_diff)
+```
+
+Wartość p w teście Shapiro-Wilka wynosi około 0,615, czyli jest większa
+od przyjętego poziomu istotności 0,05. Nie mamy więc podstaw do
+odrzucenia założenia normalności rozkładu różnic.
+
+## Wykres Q-Q dla różnic
+
+```{r qq-plot-differences}
+ggplot(reaction_data, aes(sample = reaction_diff)) +
+  stat_qq(size = 2) +
+  stat_qq_line() +
+  labs(
+    title = "Wykres Q-Q dla różnic czasu reakcji",
+    x = "Kwantyle teoretyczne",
+    y = "Kwantyle z próby"
+  ) +
+  theme_minimal()
+```
+
+Wykres Q-Q nie wskazuje na silne odstępstwa od normalności. Możemy więc
+zastosować test t-Studenta dla prób zależnych.
+
+# Test t-Studenta dla prób zależnych
+
+Wykonujemy test t-Studenta dla prób zależnych. W funkcji `t.test()`
+ustawiamy argument `paired = TRUE`, ponieważ porównujemy dwa pomiary
+wykonane na tych samych osobach.
+
+Ponieważ analizujemy dwa pomiary wykonane u tych samych kierowców,
+stosujemy test t-Studenta dla prób zależnych. Wykonaj test porównujący
+czas reakcji po alkoholu (`reaction_after`) z czasem reakcji przed
+alkoholem (`reaction_before`). Pamiętaj, aby w funkcji `t.test()`
+ustawić argument `paired = TRUE`. Wynik zapisz w obiekcie
+`paired_t_result`.
+
+```{r paired-t-test}
+paired_t_result <- t.test(reaction_data$reaction_after, reaction_data$reaction_before, paired = TRUE)
+```
+
+Wynik testu jest istotny statystycznie: **t(24) = 6,679; p \< 0,001**.
+Odrzucamy hipotezę zerową o braku średniej różnicy między czasem reakcji
+po i przed spożyciem alkoholu.
+
+# Tabela wyników testu
+
+Poniższy fragment zadziała poprawnie tylko wtedy, gdy w poprzednim kroku
+utworzono obiekt `paired_t_result`.
+
+```{r paired-t-table}
+paired_t_table <- broom::tidy(paired_t_result) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 4)))
+
+paired_t_table |>
+  knitr::kable(caption = "Wyniki testu t-Studenta dla prób zależnych")
+```
+
+W tabeli warto zwrócić uwagę na kolumny `estimate`, `statistic`,
+`p.value`, `conf.low` i `conf.high`. Kolumna `estimate` oznacza średnią
+różnicę między pomiarem po alkoholu i przed alkoholem.
+
+# Przedział ufności dla średniej różnicy
+
+Przedział ufności pokazuje zakres wartości, w którym z określonym
+poziomem ufności może znajdować się średnia różnica w populacji.
+
+Poniższy fragment korzysta z obiektu `paired_t_result`, utworzonego w
+poprzednim kroku.
+
+```{r confidence-interval}
+paired_t_result$estimate
+paired_t_result$conf.int
+```
+
+Średnia różnica wynosi około 0,068 s, a 95% przedział ufności dla tej
+różnicy wynosi od około 0,047 s do 0,088 s. Ponieważ cały przedział jest
+dodatni, wskazuje to na wydłużenie czasu reakcji po spożyciu alkoholu.
+
+# Wielkość efektu
+
+Sama istotność statystyczna mówi, czy zaobserwowana różnica jest mało
+prawdopodobna przy założeniu hipotezy zerowej. Nie mówi jednak wprost,
+jak duża jest ta różnica. Dlatego warto obliczyć również wielkość
+efektu.
+
+Dla prób zależnych można obliczyć wersję d Cohena opartą na różnicach
+między pomiarami, często oznaczaną jako $d_z$:
+
+$$d_z = \frac{\bar{d}}{s_d}$$
+
+gdzie $\bar{d}$ oznacza średnią różnicę, a $s_d$ odchylenie standardowe
+różnic. Ta miara jest dostosowana do układu przed-po, ponieważ
+wykorzystuje zmienność różnic, a nie zmienność dwóch niezależnych grup.
+
+Oblicz `d_z` Cohena na podstawie zmiennej `reaction_diff`. Wynik zapisz
+w obiekcie `cohens_dz`. Wskazówka: wykorzystaj średnią z różnic oraz
+odchylenie standardowe różnic.
+
+```{r effect-size}
+d_z <- mean(reaction_data$reaction_diff)/sd(reaction_data$reaction_diff)
+d_z
+```
+
+Wartość $d_z$ wynosi około 1,34, co wskazuje na dużą wielkość efektu.
+Oznacza to, że średnia zmiana czasu reakcji była duża w relacji do
+zmienności różnic między pomiarami.
+
+Warto pamiętać, że `d_z` jest jedną z wersji d Cohena stosowaną dla
+danych zależnych. Nie należy jej bezpośrednio utożsamiać z d Cohena
+liczonym dla dwóch prób niezależnych.
+
+# Wniosek końcowy
+
+Przeprowadzono test t-Studenta dla prób zależnych w celu sprawdzenia,
+czy przeciętny czas reakcji kierowców różnił się przed i po spożyciu
+alkoholu. Ponieważ analizowano tych samych kierowców w dwóch warunkach,
+właściwym podejściem było porównanie pomiarów zależnych. Diagnostyka
+rozkładu różnic nie wskazała na istotne naruszenie założenia
+normalności.
+
+Średni czas reakcji przed spożyciem alkoholu wynosił około 0,201 s,
+natomiast po spożyciu alkoholu około 0,269 s. Średnia różnica wyniosła
+około 0,068 s. Wynik testu t dla prób zależnych był istotny
+statystycznie: **t(24) = 6,679; p \< 0,001**. Oznacza to, że po spożyciu
+alkoholu przeciętny czas reakcji był istotnie dłuższy niż przed
+spożyciem alkoholu.
+
+95% przedział ufności dla średniej różnicy wyniósł od około 0,047 s do
+0,088 s, co oznacza, że w analizowanych danych wzrost czasu reakcji był
+nie tylko istotny statystycznie, ale także spójnie dodatni. Wielkość
+efektu była duża ($d_z \approx 1{,}34$), co wskazuje, że zmiana czasu
+reakcji była wyraźna względem zmienności różnic między pomiarami.
+
+# Najważniejsze elementy procedury
+
+W analizie typu przed-po należy pamiętać o kilku krokach:
+
+1.  rozpoznać, że dane są zależne, ponieważ te same osoby mierzono
+    dwukrotnie,
+2.  obliczyć różnice między pomiarami,
+3.  sprawdzić normalność rozkładu różnic,
+4.  zastosować test t-Studenta dla prób zależnych, jeśli założenie
+    normalności różnic jest akceptowalne,
+5.  zinterpretować średnią różnicę, przedział ufności i wielkość efektu.

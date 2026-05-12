@@ -1,0 +1,543 @@
+---
+title: "Korozja — test t dla dwóch grup niezależnych"
+author: "Materiały do laboratorium — Język R / Data Science"
+date: "`r format(Sys.Date(), '%d.%m.%Y')`"
+subtitle: "Wersja studencka do rozwiązania"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    fig_width: 7
+    fig_height: 4.5
+  word_document:
+    toc: true
+    toc_depth: 3
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  dpi       = 110
+)
+
+options(scipen = 999, digits = 4)
+```
+
+# Cel ćwiczenia
+
+W tym ćwiczeniu wykonujemy kompletną, ale skróconą analizę danych z
+wykorzystaniem **testu t dla dwóch prób niezależnych**.
+
+Zajęcia dotyczą przede wszystkim języka R, dlatego najważniejsze jest
+przećwiczenie pełnej ścieżki programistycznej:
+
+1.  wczytanie danych,
+2.  przygotowanie zmiennych,
+3.  opis danych w grupach,
+4.  wykonanie wykresu,
+5.  sprawdzenie podstawowych założeń,
+6.  wykonanie testu t,
+7.  uzupełnienie wyniku o wielkość efektu,
+8.  sformułowanie krótkiego wniosku.
+
+Przy okazji powtarzamy podstawową logikę analizy statystycznej: najpierw
+oglądamy dane, potem dobieramy test, a na końcu interpretujemy wynik.
+
+# Opis problemu badawczego
+
+W doświadczeniu porównano dwie rury kanalizacyjne zabezpieczone dwoma
+typami powłok. Rury zakopano w identycznych warunkach glebowych i
+pozycyjnych oraz w tym samym czasie.
+
+Mierzono korozję, wyrażając głębokość uszkodzeń w tysięcznych częściach
+milimetra. Wykonano 30 pomiarów:
+
+- 15 pomiarów dla powłoki A,
+- 15 pomiarów dla powłoki B.
+
+Pytanie badawcze brzmi:
+
+> Czy przeciętna głębokość uszkodzeń różni się pomiędzy dwoma rodzajami
+> powłok?
+
+# Zmienne w analizie
+
+| Zmienna w badaniu     | Rola w analizie   | Typ zmiennej                  |
+|-----------------------|-------------------|-------------------------------|
+| głębokość uszkodzenia | zmienna zależna   | ilościowa                     |
+| rodzaj powłoki        | zmienna grupująca | jakościowa nominalna, 2 grupy |
+
+Ponieważ porównujemy zmienną ilościową w dwóch niezależnych grupach,
+odpowiednim kandydatem jest **test t dla dwóch prób niezależnych**.
+
+# Przygotowanie środowiska
+
+## Instalacja pakietów
+
+Poniższy kod należy uruchomić tylko wtedy, gdy któryś z pakietów nie
+jest jeszcze zainstalowany.
+
+```{r install-packages, eval = FALSE}
+install.packages(c(
+  "tidyverse",   # praca z danymi i wykresy
+  "car",         # test Levene'a
+  "broom",       # porządkowanie wyników testów
+  "effectsize",  # wielkości efektu
+  "knitr",       # estetyczne tabele w R Markdown
+  "pwr"          # analiza mocy testu
+))
+```
+
+## Wczytanie bibliotek
+
+```{r load-libraries}
+library(tidyverse)
+library(car)
+library(broom)
+library(effectsize)
+library(knitr)
+library(pwr)
+```
+
+## Parametry analizy
+
+Poziom istotności zapisujemy w osobnym obiekcie. Dzięki temu, gdybyśmy
+chcieli zmienić poziom istotności, robimy to tylko w jednym miejscu.
+
+```{r analysis-parameters}
+alpha <- 0.05
+```
+
+# Wczytanie danych
+
+Zakładamy, że plik `Korozja.csv` znajduje się w tym samym folderze co
+plik RMD.
+
+```{r read-data}
+data_file <- "Korozja.csv"
+
+if (!file.exists(data_file)) {
+  stop("Nie znaleziono pliku Korozja.csv w bieżącym folderze roboczym.")
+}
+
+raw_data <- readr::read_delim(
+  file = data_file,
+  delim = ";",
+  locale = readr::locale(decimal_mark = ","),
+  trim_ws = TRUE,
+  show_col_types = FALSE
+)
+```
+
+# Przygotowanie danych
+
+W pliku źródłowym kolumny mają polskie nazwy. W danych nie jest to
+problemem, ale w kodzie wygodniej używać prostych nazw roboczych.
+Dlatego tworzymy nową ramkę danych z nazwami:
+
+- `coating_type` - rodzaj powłoki,
+- `damage_depth` - głębokość uszkodzenia.
+
+```{r clean-data}
+corrosion_data <- raw_data
+
+names(corrosion_data) <- c("coating_type", "damage_depth")
+
+corrosion_data <- corrosion_data |>
+  dplyr::mutate(
+    coating_type = factor(coating_type),
+    damage_depth = as.numeric(damage_depth)
+  ) |>
+  tidyr::drop_na(coating_type, damage_depth)
+```
+
+> **Dobra praktyka programistyczna**\
+> W kodzie R warto unikać polskich znaków w nazwach obiektów i kolumn
+> roboczych. Dane mogą mieć polskie etykiety, ale kod jest zwykle
+> stabilniejszy i czytelniejszy, gdy używamy prostych nazw technicznych.
+
+# Kontrola danych
+
+## Struktura ramki danych
+
+Sprawdź strukturę przygotowanej ramki danych \`corrosion_data\`. Zwróć
+uwagę na typy zmiennych: \`damage_depth\` powinna być zmienną liczbową,
+a \`coating_type\` zmienną grupującą.
+
+```{r data-structure}
+glimpse(corrosion_data)
+```
+
+## Liczebności grup
+
+Sprawdź liczebności obserwacji dla każdego typu powłoki. Wykorzystaj
+zmienną grupującą \`coating_type\`.
+
+```{r group-counts}
+corrosion_data |>
+  dplyr::count(coating_type)
+```
+
+W każdej grupie powinno być 15 obserwacji. Taki układ jest
+**zrównoważony**, czyli obie porównywane grupy mają taką samą
+liczebność.
+
+# Definicja problemu statystycznego
+
+Interesuje nas zależność:
+
+``` text
+damage_depth ~ coating_type
+```
+
+czyli sprawdzamy, czy wartości zmiennej ilościowej `damage_depth` różnią
+się pomiędzy dwoma poziomami zmiennej grupującej `coating_type`.
+
+Hipotezy dla testu t są następujące:
+
+**Hipoteza zerowa H0:**
+
+> Przeciętna głębokość uszkodzeń jest taka sama dla obu powłok.
+
+**Hipoteza alternatywna H1:**
+
+> Przeciętna głębokość uszkodzeń różni się pomiędzy powłokami.
+
+Wykonujemy test dwustronny, ponieważ interesuje nas dowolna różnica
+pomiędzy powłokami, a nie wyłącznie sytuacja, w której jedna konkretna
+powłoka ma większą albo mniejszą średnią głębokość uszkodzeń.
+
+# Wstępna eksploracja danych
+
+## Statystyki opisowe w grupach
+
+Oblicz podstawowe statystyki opisowe zmiennej \`damage_depth\` osobno
+dla każdego typu powłoki. Wyniki posortuj malejąco według średniej.
+
+```{r descriptive-statistics}
+group_summary <- corrosion_data |>
+  dplyr::group_by(coating_type) |>
+  dplyr::summarise(
+    n      = dplyr::n(),
+    mean   = mean(damage_depth),
+    median = median(damage_depth),
+    sd     = sd(damage_depth),
+    min    = min(damage_depth),
+    max    = max(damage_depth),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(dplyr::desc(mean))
+
+group_summary |>
+  knitr::kable(
+    digits = 2,
+    caption = "Statystyki opisowe głębokości uszkodzeń w grupach"
+  )
+```
+
+Komentarz: średnia głębokość uszkodzeń jest wyższa w grupie powłoki A
+niż w grupie powłoki B. Różnica na poziomie opisowym wynosi około 8
+jednostek pomiarowych. Nie oznacza to jeszcze, że różnica jest
+statystycznie istotna.
+
+## Wykres ramka-wąsy z punktami
+
+Wykres ramka-wąsy pokazuje medianę, rozrzut wyników i obserwacje
+odstające. Punkty dodane na wykresie pokazują pojedyncze pomiary.
+
+Przygotuj wykres ramka-wąsy pokazujący wartości zmiennej
+\`damage_depth\` w grupach wyznaczonych przez zmienną \`coating_type\`.\
+\
+Na wykresie powinny znaleźć się również pojedyncze obserwacje jako
+punkty. W razie potrzeby skorzystaj z funkcji z pakietu \`ggplot2\`, np.
+\`ggplot()\`, \`aes()\`, \`geom_boxplot()\`, \`geom_jitter()\`,
+\`labs()\` i \`theme_minimal()\`.
+
+```{r boxplot-with-points}
+ggplot(corrosion_data, aes(x = coating_type, y = damage_depth, group = coating_type)) +
+  geom_boxplot() +
+  geom_jitter(
+    width = 0.1,
+    size = 2,
+    alpha = 1
+  ) +
+  labs(
+    title = "Głębokość uszkodzeń według rodzaju powłoki",
+    x = "Rodzaj powłoki",
+    y = "Głębokość uszkodzeń"
+  ) +
+  theme_minimal()
+```
+
+Interpretacja wykresu: wyniki dla powłoki A są przeciętnie wyższe niż
+dla powłoki B, ale rozkłady obu grup częściowo się nakładają. Widzimy
+więc różnicę opisową, ale potrzebny jest test statystyczny, aby ocenić,
+czy jest ona istotna statystycznie.
+
+# Sprawdzenie założeń testu t
+
+## Normalność rozkładu w grupach
+
+Test Shapiro-Wilka sprawdza hipotezę zerową, że dane pochodzą z rozkładu
+normalnego. Wykonujemy go osobno dla każdej grupy.
+
+Wykonaj test Shapiro-Wilka osobno dla każdego typu powłoki. Wynik zapisz
+w obiekcie \`shapiro_results\`. Tabela powinna zawierać nazwę grupy,
+wartość statystyki testowej oraz wartość p.\
+\
+Wskazówka: możesz wykorzystać funkcje \`group_by()\` i \`summarise()\` z
+pakietu \`dplyr\` oraz funkcję \`shapiro.test()\`.
+
+```{r shapiro-tests-by-group}
+corrosion_data |> group_by(coating_type) |> 
+  summarise(statistic = shapiro.test(damage_depth)$stat, p_value = shapiro.test(damage_depth)$p.value) |>
+  mutate(across(where(is.numeric), ~ sprintf("%.4f", .x)))
+```
+
+W obu grupach wartości p w testach Shapiro-Wilka są większe od
+przyjętego poziomu istotności α = 0,05. Nie mamy więc podstaw do
+odrzucenia założenia normalności w żadnej z grup.
+
+## Wykresy Q-Q
+
+Test Shapiro-Wilka warto uzupełnić wykresami Q-Q. Jeżeli punkty układają
+się w przybliżeniu wzdłuż linii referencyjnej, rozkład danych można
+uznać za zbliżony do normalnego.
+
+```{r qq-plots}
+ggplot(corrosion_data, aes(sample = damage_depth)) +
+  stat_qq(size = 2) +
+  stat_qq_line() +
+  facet_wrap(~ coating_type) +
+  labs(
+    title = "Wykresy Q-Q dla głębokości uszkodzeń",
+    x = "Kwantyle teoretyczne",
+    y = "Kwantyle z próby"
+  ) +
+  theme_minimal()
+```
+
+Na wykresach Q-Q punkty układają się w przybliżeniu wzdłuż linii
+referencyjnej. Nie widać wyraźnego naruszenia założenia normalności.
+
+## Jednorodność wariancji — test Levene'a
+
+Test Levene'a sprawdza hipotezę zerową o równości wariancji w grupach.
+Jeżeli p \> 0,05, nie mamy podstaw do odrzucenia założenia o podobnych
+wariancjach.
+
+Wykonaj test Levene’a dla zmiennej `damage_depth` w grupach wyznaczonych
+przez zmienną `coating_type`.\
+\
+Wskazówka: użyj funkcji `car::leveneTest()` oraz zapisu formułowego:
+`zmienna_liczbowa ~ zmienna_grupująca`. W argumencie `data` wskaż ramkę
+danych `corrosion_data`.
+
+```{r levene-test}
+car::leveneTest(
+  damage_depth ~ coating_type,
+  data = corrosion_data
+)
+```
+
+Wartość p w teście Levene'a jest większa od α = 0,05, więc nie mamy
+podstaw do odrzucenia hipotezy o jednorodności wariancji. Oznacza to, że
+założenie podobieństwa wariancji można uznać za spełnione.
+
+# Test t-Studenta dla dwóch prób niezależnych
+
+Ponieważ diagnostyka nie wskazała na istotne naruszenie założeń
+normalności i jednorodności wariancji, możemy zastosować klasyczny test
+t-Studenta dla dwóch prób niezależnych.
+
+Wykonaj test t-Studenta, w którym zmienną zależną jest `damage_depth`, a
+zmienną grupującą jest `coating_type`. Wskazówka: użyj funkcji
+`t.test()` oraz zapisu formułowego:
+`zmienna_liczbowa ~ zmienna_grupująca`.
+
+W R domyślna funkcja `t.test()` wykonuje test Welcha. Aby wykonać
+klasyczny test t-Studenta z założeniem równych wariancji, należy ustawić
+argument `var.equal = TRUE`.
+
+```{r student-t-test}
+student_t_result <- t.test(damage_depth ~ coating_type, data = corrosion_data, var.equal = TRUE)
+```
+
+## Tabela wyników testu
+
+Wynik testu możemy przekształcić do wygodnej tabeli za pomocą funkcji
+`broom::tidy()`.
+
+**Uwaga!** Poniższy fragment zadziała poprawnie tylko wtedy, gdy w
+poprzednim kroku zapisano wynik testu w obiekcie `student_t_result`.
+
+```{r student-t-table}
+student_t_table <- broom::tidy(student_t_result) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 4)))
+
+student_t_table |>
+  knitr::kable(caption = "Wyniki testu t-Studenta")
+```
+
+## Interpretacja wyniku testu
+
+Wynik testu t-Studenta nie był istotny statystycznie:
+
+***t*****(28) = 1,959; p = 0,0601.**
+
+Ponieważ wartość p jest większa od α = 0,05, nie mamy podstaw do
+odrzucenia hipotezy zerowej o równości średnich. Oznacza to, że na
+podstawie tych danych nie wykazano statystycznie istotnej różnicy
+przeciętnej głębokości uszkodzeń pomiędzy powłoką A i powłoką B.
+
+Bardzo ważne: nie mówimy, że średnie są na pewno takie same. Mówimy
+ostrożniej: **na podstawie tych danych nie wykazano statystycznie
+istotnej różnicy średnich**.
+
+## Przedział ufności dla różnicy średnich
+
+Test t zwraca również 95% przedział ufności dla różnicy średnich.
+
+**Uwaga!** Ten fragment korzysta z obiektu `student_t_result`
+utworzonego w poprzednim kroku.
+
+```{r confidence-interval}
+mean_difference <- unname(
+  student_t_result$estimate[1] - student_t_result$estimate[2]
+)
+
+confidence_interval <- student_t_result$conf.int
+
+mean_difference
+confidence_interval
+```
+
+Różnica średnich A - B wynosi około 8,00. Natomiast 95% przedział
+ufności dla tej różnicy wynosi od około -0,36 do około 16,36.
+
+Ponieważ przedział ufności obejmuje 0, wynik jest spójny z decyzją
+testu: różnica nie jest statystycznie istotna na poziomie α = 0,05.
+
+# Wielkość efektu
+
+Wartość p mówi, czy efekt jest statystycznie istotny przy danej
+liczebności próby i zmienności danych. Nie mówi jednak wprost, jak duża
+jest różnica.
+
+Dlatego obliczymy **d Cohena**, czyli standaryzowaną różnicę średnich.
+
+Oblicz d Cohena dla porównania grup `A` i `B`. Wynik zapisz w obiekcie
+`cohens_d_result`.
+
+Wskazówka: użyj funkcji `effectsize::cohens_d()` oraz zapisu
+formułowego: `zmienna_liczbowa ~ zmienna_grupująca`. Przyjmij wspólne
+odchylenie standardowe dla obu grup (`pooled_sd = TRUE`) i wyznacz 95%
+przedział ufności.
+
+```{r effect-size}
+cohens_d_result <- effectsize::cohens_d(
+  damage_depth ~ coating_type,
+  data = corrosion_data,
+  pooled_sd = TRUE
+)
+
+cohens_d_result |>
+  as_tibble() |>
+  transmute(
+    cohens_d = round(Cohens_d, 4),
+    CI = CI,
+    CI_low = round(CI_low, 4),
+    CI_high = round(CI_high, 4)
+  )
+```
+
+Wartość d Cohena wynosi około 0,72, czyli różnica średnich odpowiada
+około 0,72 wspólnego odchylenia standardowego. Jest to efekt umiarkowany
+do dość dużego. W tym przykładzie efekt jest widoczny opisowo, ale przy
+liczebności 15 obserwacji w każdej grupie wynik testu nie osiągnął
+przyjętego progu istotności statystycznej.
+
+W analizie mocy traktujemy otrzymane d Cohena jako przybliżenie efektu,
+który chcielibyśmy wykrywać w przyszłym, podobnym eksperymencie. Nie
+oznacza to, że taka wielkość efektu jest na pewno prawdziwa w populacji.
+
+### Zadanie dodatkowe (dodatkowy 1 punkt)
+
+Na podstawie obliczonej wcześniej wielkości efektu d Cohena oszacuj,
+jaka powinna być minimalna liczebność próby w każdej grupie, aby w
+analogicznym eksperymencie moc dwustronnego testu t-Studenta wynosiła
+80%, przy poziomie istotności α = 0,05.
+
+Wskazówka: możesz wykorzystać funkcję `pwr::pwr.t.test()`. Pamiętaj, że
+w funkcji tej argument `n` oznacza liczebność w każdej z dwóch grup.
+
+```{r power-analysis-bonus}
+# Wskazówka:
+# 1. Wyciągnij wartość d Cohena z obiektu cohens_d_result.
+# 2. Użyj wartości bezwzględnej efektu.
+# 3. Wykorzystaj funkcję pwr::pwr.t.test().
+# 4. Zaokrąglij wynik w górę, ponieważ liczebność próby musi być liczbą całkowitą.
+```
+
+Otrzymana wartość `n` oznacza szacowaną liczebność w każdej z dwóch
+grup. Wynik należy zaokrąglić w górę. Obliczenie to zakłada, że w
+przyszłym, analogicznym eksperymencie rzeczywista wielkość efektu byłaby
+podobna do tej zaobserwowanej w analizowanej próbie.
+
+# Końcowy wniosek
+
+Przeprowadzono test t-Studenta dla dwóch prób niezależnych w celu
+sprawdzenia, czy przeciętna głębokość uszkodzeń różni się pomiędzy dwoma
+rodzajami powłok. Wstępna diagnostyka nie wskazała na istotne naruszenie
+założeń normalności i jednorodności wariancji.
+
+Średnia głębokość uszkodzeń była wyższa dla powłoki A niż dla powłoki B.
+Różnica średnich wyniosła około 8,00 jednostek pomiarowych. Wynik testu
+nie był jednak istotny statystycznie: ***t*****(28) = 1,959; p =
+0,0601**. Na poziomie istotności α = 0,05 nie mamy podstaw do odrzucenia
+hipotezy zerowej o równości średnich.
+
+Wielkość efektu była umiarkowana do dość dużej (**d Cohena ≈ 0,72**), co
+wskazuje, że zaobserwowana różnica była zauważalna opisowo. Jednocześnie
+należy podkreślić, że na podstawie tych danych nie wykazano
+statystycznie istotnej różnicy przeciętnej głębokości uszkodzeń pomiędzy
+porównywanymi powłokami.
+
+# Najczęstsze błędy w tej analizie
+
+1.  **Mylenie testu dla prób niezależnych z testem dla prób zależnych**\
+    Test dla prób zależnych stosujemy wtedy, gdy mierzymy te same
+    obiekty dwa razy lub mamy naturalnie sparowane obserwacje. Tutaj
+    traktujemy grupy jako niezależne.
+
+2.  **Użycie domyślnego `t.test()` bez świadomości, co robi R**\
+    Domyślnie `t.test()` wykonuje test Welcha. Klasyczny test t-Studenta
+    z założeniem równych wariancji wymaga argumentu `var.equal = TRUE`.
+
+3.  **Stwierdzenie, że średnie są identyczne**\
+    Brak istotności statystycznej nie oznacza, że średnie są na pewno
+    takie same. Oznacza, że w danych nie ma wystarczających podstaw do
+    wykazania różnicy.
+
+4.  **Interpretowanie p = 0,0601 jako „prawie istotne”**\
+    Wynik jest blisko progu 0,05, ale przy przyjętym poziomie istotności
+    nie spełnia kryterium istotności statystycznej.
+
+5.  **Nadmierne poleganie tylko na wartości p**\
+    Warto patrzeć także na średnie, odchylenia standardowe, wykresy,
+    przedział ufności i wielkość efektu.
