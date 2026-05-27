@@ -1,0 +1,2014 @@
+---
+title: "Modelowanie zużycia paliwa — regresja z tidymodels"
+author: "Materiały do przedmiotu **R dla Data Science**"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    fig_width: 7
+    fig_height: 4.5
+  word_document:
+    toc: true
+    toc_depth: '3'
+subtitle: "Regresja liniowa, LASSO, drzewo CART i XGBoost — od czyszczenia po SHAP"
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  dpi       = 110
+)
+options(scipen = 999, digits = 4)
+```
+
+# Wprowadzenie
+
+## O czym jest ten dokument
+
+Ten dokument prowadzi przez **kompletną ścieżkę modelowania
+regresyjnego** - od wczytania surowego pliku Excel z danymi o
+samochodach, przez czyszczenie i inżynierię cech, po budowę, strojenie i
+porównanie czterech modeli predykcyjnych. Całość jest realizowana w
+ekosystemie **tidymodels** - nowoczesnym frameworku do modelowania w R.
+
+Dokument łączy trzy warstwy:
+
+-   **warstwa analityczna** - każdy krok jest wykonany i zinterpretowany
+    w kontekście problemu predykcyjnego,
+-   **warstwa programistyczna** - kod wykorzystuje pipeline'y tidymodels
+    (recipes → workflows → tune), które zapewniają powtarzalność i brak
+    wycieku danych,
+-   **warstwa dydaktyczna** - bloki oznaczone **📖 Przypomnienie
+    teoretyczne** wyjaśniają statystyczne „dlaczego" za każdą decyzją.
+
+## Czego dotyczy analiza
+
+Pytanie predykcyjne: **czy na podstawie parametrów technicznych
+samochodu (pojemność, moc, masa, liczba cylindrów, przyspieszenie, rok
+produkcji, pochodzenie) można przewidzieć jego zużycie paliwa?**
+
+Porównamy cztery podejścia: **regresję liniową** (OLS), **LASSO**
+(regularyzacja L1), **drzewo regresyjne** (CART) i **XGBoost** (gradient
+boosting). Każdy model zostanie oceniony na zbiorze walidacyjnym (v-fold
+CV), a najlepszy - na odłożonym zbiorze testowym.
+
+## Ścieżka analizy - mapa dokumentu
+
+1.  **Czym jest tidymodels?** → krótkie wprowadzenie do frameworka
+2.  **Wczytanie i przegląd danych** → zrozumienie struktury
+3.  **Eksploracja (EDA)** → rozkłady, korelacje, outlier'y
+4.  **Podział train / test** → `rsample::initial_split()`
+5.  **Preprocessing z recipes** → winsoryzacja, kodowanie, standaryzacja
+6.  **Regresja liniowa (OLS)** → model bazowy
+7.  **Regresja LASSO** → regularyzacja i selekcja zmiennych
+8.  **Drzewo regresyjne (CART)** → model nieparametryczny + strojenie
+9.  **XGBoost** → gradient boosting + strojenie siatki
+10. **Porównanie modeli** → metryki CV obok siebie
+11. **Ewaluacja na zbiorze testowym** → ocena generalizacji
+12. **Interpretowalność** → ważność zmiennych i SHAP
+
+## Konwencje użyte w dokumencie
+
+-   **📖 Przypomnienie teoretyczne** - zwięzłe wprowadzenie przed
+    krokiem analitycznym.
+-   **⚠️ Pułapka** — typowy błąd, którego warto unikać.
+-   Sekcje oznaczone **(\*)** są opcjonalne.
+
+------------------------------------------------------------------------
+
+# Czym jest tidymodels?
+
+> **📖 Wprowadzenie do ekosystemu tidymodels**
+>
+> **tidymodels** to zestaw pakietów R stworzonych przez zespół RStudio /
+> Posit, który ujednolica i upraszcza cały proces modelowania
+> statystycznego i uczenia maszynowego. Analogicznie do tego, jak
+> **tidyverse** ujednolica manipulację danymi, tidymodels ujednolica
+> modelowanie.
+>
+> Kluczowe pakiety:
+>
+> | Pakiet | Rola |
+> |------------------------------------|------------------------------------|
+> | **rsample** | podział danych (train/test, v-fold CV) |
+> | **recipes** | preprocessing: transformacje, kodowanie, standaryzacja |
+> | **parsnip** | ujednolicony interfejs do modeli (lm, glmnet, xgboost, rpart...) |
+> | **workflows** | łączenie recipe + model w jeden pipeline |
+> | **tune** | strojenie hiperparametrów (grid search, Bayesian) |
+> | **yardstick** | metryki jakości (RMSE, MAE, R², MAPE...) |
+> | **workflowsets** | porównanie wielu pipeline'ów naraz |
+>
+> **Dlaczego tidymodels, a nie „gołe" pakiety?**
+>
+> 1.  **Brak wycieku danych** - preprocessing (np. standaryzacja,
+>     imputacja) jest definiowany w `recipe`, ale **obliczany tylko na
+>     zbiorze treningowym** i automatycznie stosowany do testowego. W
+>     ręcznym podejściu łatwo popełnić błąd i policzyć średnią na całym
+>     zbiorze.
+> 2.  **Jednolity interfejs** - zmiana modelu z regresji liniowej na
+>     XGBoost to zmiana jednej linijki (`set_engine()`), reszta
+>     pipeline'u pozostaje bez zmian.
+> 3.  **Powtarzalność** - cały przepis (recipe + model + tuning) jest
+>     obiektem, który można zapisać, odtworzyć i wersjonować.
+>
+> **Schemat pracy w tidymodels:**
+>
+> ```         
+> dane → split (rsample)
+>          ├── training → recipe (preprocessing)
+>          │                 ↓
+>          │              workflow (recipe + model)
+>          │                 ↓
+>          │              tune / fit (v-fold CV)
+>          │                 ↓
+>          │              select_best → finalize
+>          └── testing  → last_fit → metryki końcowe
+> ```
+
+------------------------------------------------------------------------
+
+# Przygotowanie środowiska
+
+## Wymagane pakiety
+
+```{r install-packages, eval = FALSE}
+packages <- c(
+  "tidyverse",       # manipulacja i wizualizacja danych
+  "tidymodels",      # rsample, recipes, parsnip, workflows, tune, yardstick
+  "readxl",          # wczytywanie plików Excel
+  "janitor",         # porządkowanie nazw kolumn
+  "skimr",           # szybki przegląd statystyczny
+  "corrplot",        # wizualizacja korelacji
+  "vip",             # ważność zmiennych (Variable Importance Plots)
+  "patchwork",       # łączenie wykresów ggplot
+  "knitr",           # kable()
+  "glmnet",          # silnik dla LASSO
+  "rpart",           # silnik dla drzew CART
+  "rpart.plot",      # wizualizacja drzew
+  "xgboost",         # silnik dla XGBoost
+  "shapviz",         # SHAP
+  "kknn"             # silnik dla KNN
+)
+
+missing_packages <- packages[
+  !vapply(packages, requireNamespace, logical(1), quietly = TRUE)
+]
+
+if (length(missing_packages) > 0) {
+  install.packages(missing_packages)
+} else {
+  message("Wszystkie wymagane pakiety są już zainstalowane.")
+}
+```
+
+## Wczytanie bibliotek
+
+```{r load-libraries}
+library(tidyverse)     # dplyr + ggplot2 + tidyr + purrr
+library(tidymodels)    # cały ekosystem tidymodels
+library(readxl)        # read_excel()
+library(janitor)       # clean_names()
+library(skimr)         # skim()
+library(corrplot)      # corrplot()
+library(vip)           # vip(), vi()
+library(patchwork)     # operator + do łączenia ggplotów
+library(knitr)         # kable()
+library(rpart.plot)    # rpart.plot()
+library(shapviz)       # SHAP
+library(kknn)          # KNN
+
+tidymodels_prefer()    # rozwiązuje konflikty nazw na korzyść tidymodels
+set.seed(42)           # powtarzalność wyników
+```
+
+## Własny krok `recipes` do winsoryzacji IQR
+
+W tym materiale stosujemy winsoryzację, ale robimy to jako pełnoprawny
+krok `recipes`. Dzięki temu granice przycinania są wyznaczane w `prep()`
+wyłącznie na danych uczących, a następnie te same granice są stosowane w
+`bake()` do danych walidacyjnych lub testowych. W walidacji krzyżowej
+oznacza to, że granice są estymowane osobno w każdym foldzie, wyłącznie
+na części treningowej danego folda. **Szczegóły implementacyjne tego
+kroku można potraktować jako materiał dodatkowy**
+
+Nie musisz teraz rozumieć całej implementacji tego kroku. Wystarczy
+wiedzieć, że definiujemy własny krok `recipes`, który będzie potem
+działał tak jak standardowe kroki: `step_dummy()`, `step_normalize()`
+czy `step_zv()`.
+
+```{r custom-step-winsorize-iqr}
+step_winsorize_iqr <- function(recipe,
+                               ...,
+                               role = NA,
+                               trained = FALSE,
+                               limits = NULL,
+                               multiplier = 1.5,
+                               skip = FALSE,
+                               id = recipes::rand_id("winsorize_iqr")) {
+  recipes::add_step(
+    recipe,
+    step_winsorize_iqr_new(
+      terms = rlang::enquos(...),
+      role = role,
+      trained = trained,
+      limits = limits,
+      multiplier = multiplier,
+      skip = skip,
+      id = id
+    )
+  )
+}
+
+step_winsorize_iqr_new <- function(terms,
+                                   role,
+                                   trained,
+                                   limits,
+                                   multiplier,
+                                   skip,
+                                   id) {
+  recipes::step(
+    subclass = "winsorize_iqr",
+    terms = terms,
+    role = role,
+    trained = trained,
+    limits = limits,
+    multiplier = multiplier,
+    skip = skip,
+    id = id
+  )
+}
+
+prep.step_winsorize_iqr <- function(x, training, info = NULL, ...) {
+  col_names <- names(recipes::recipes_eval_select(x$terms, training, info))
+
+  recipes::check_type(training[, col_names], types = c("double", "integer"))
+
+  limits <- list()
+
+  for (col_name in col_names) {
+    values <- training[[col_name]]
+
+    if (all(is.na(values))) {
+      limits[[col_name]] <- c(lower = -Inf, upper = Inf)
+    } else {
+      q <- stats::quantile(values,
+                           probs = c(0.25, 0.75),
+                           na.rm = TRUE,
+                           names = FALSE)
+      iqr_value <- q[2] - q[1]
+
+      limits[[col_name]] <- c(
+        lower = q[1] - x$multiplier * iqr_value,
+        upper = q[2] + x$multiplier * iqr_value
+      )
+    }
+  }
+
+  step_winsorize_iqr_new(
+    terms = x$terms,
+    role = x$role,
+    trained = TRUE,
+    limits = limits,
+    multiplier = x$multiplier,
+    skip = x$skip,
+    id = x$id
+  )
+}
+
+bake.step_winsorize_iqr <- function(object, new_data, ...) {
+  col_names <- names(object$limits)
+  recipes::check_new_data(col_names, object, new_data)
+
+  for (col_name in col_names) {
+    lower <- object$limits[[col_name]][["lower"]]
+    upper <- object$limits[[col_name]][["upper"]]
+
+    new_data[[col_name]] <- pmin(
+      pmax(new_data[[col_name]], lower),
+      upper
+    )
+  }
+
+  new_data
+}
+
+print.step_winsorize_iqr <- function(x,
+                                     width = max(20, options()$width - 35),
+                                     ...) {
+  recipes::print_step(
+    tr_obj = names(x$limits),
+    untr_obj = x$terms,
+    trained = x$trained,
+    title = "Winsoryzacja IQR dla ",
+    width = width
+  )
+  invisible(x)
+}
+
+tidy.step_winsorize_iqr <- function(x, ...) {
+  if (recipes::is_trained(x)) {
+    if (length(x$limits) == 0) {
+      out <- tibble(
+        terms = character(),
+        lower = numeric(),
+        upper = numeric()
+      )
+    } else {
+      out <- purrr::map_dfr(
+        names(x$limits),
+        ~ tibble(
+          terms = .x,
+          lower = unname(x$limits[[.x]][["lower"]]),
+          upper = unname(x$limits[[.x]][["upper"]])
+        )
+      )
+    }
+  } else {
+    out <- tibble(
+      terms = recipes::sel2char(x$terms),
+      lower = rlang::na_dbl,
+      upper = rlang::na_dbl
+    )
+  }
+
+  out$id <- x$id
+  out
+}
+```
+
+W dalszej części użyjemy pomocniczej funkcji `step_winsorize_iqr()`.
+Jest to własny krok `recipes`, który działa analogicznie do innych
+kroków preprocessingu: podczas `prep()` wyznacza granice winsoryzacji na
+danych treningowych, a podczas `bake()` stosuje te same granice do
+danych walidacyjnych lub testowych. Dzięki temu winsoryzacja nie
+powoduje wycieku danych.
+
+> **⚠️ Pułapka:** Funkcja `tidymodels_prefer()` rozwiązuje konflikty
+> nazw (np. `yardstick::spec()` vs `readr::spec()`). Bez niej mogą
+> pojawić się trudne do zdiagnozowania błędy.
+
+------------------------------------------------------------------------
+
+# Wczytanie i pierwszy przegląd danych
+
+## Opis zbioru danych
+
+Zbiór **Auto MPG** zawiera dane o 392 samochodach osobowych z lat 70. i
+80. XX wieku. Zmienne:
+
+| Zmienna       | Opis                                        | Skala         |
+|-------------------|----------------------------------|-------------------|
+| `zuzycie`     | zużycie paliwa (l/100 km)                   | ilorazowa     |
+| `cylindry`    | liczba cylindrów                            | porządkowa    |
+| `pojemnosc`   | pojemność silnika (cm³)                     | ilorazowa     |
+| `moc`         | moc silnika (KM)                            | ilorazowa     |
+| `masa`        | masa pojazdu (kg)                           | ilorazowa     |
+| `przysp`      | czas przyspieszenia 0–60 mph (s)            | ilorazowa     |
+| `rok`         | rok produkcji (ostatnie 2 cyfry)            | przedziałowa  |
+| `pochodzenie` | kontynent pochodzenia (Ameryka/Azja/Europa) | nominalna     |
+| `nazwa`       | nazwa samochodu                             | identyfikator |
+
+```{r load-data}
+df_raw <- read_excel("auto-mpg.xlsx")
+```
+
+W tym przypadku oryginalne nazwy kolumn (`zuzycie`, `cylindry`,
+`pojemnosc`, `moc`, `masa`, `przysp`, `rok`, `pochodzenie`, `nazwa`) są
+już stosunkowo czyste - nie zawierają spacji ani nawiasów.
+`clean_names()` upewnia się jednak, że format jest jednolicie
+**snake_case** i nie pojawią się niespodzianki (np. niewidoczne znaki
+czy wielkie litery). Dodatkowa kolumna `case_id` numeruje obserwacje -
+przydaje się do identyfikacji konkretnych samochodów w późniejszych
+krokach diagnostycznych.
+
+```{r clean-names}
+df <- df_raw %>%
+  clean_names() %>%
+  mutate(case_id = row_number(), .before = 1)
+
+names(df)
+```
+
+## Szybki przegląd
+
+```{r first-glance}
+dim(df)
+```
+
+```{r}
+glimpse(df)
+```
+
+```{r skim}
+skim(df)
+```
+
+## Ustalenie ról zmiennych
+
+```{r variable-roles}
+id_vars     <- c("case_id", "nazwa")
+target_var  <- "zuzycie"
+cat_preds   <- "pochodzenie"
+num_preds   <- setdiff(names(df), c(id_vars, target_var, cat_preds))
+
+cat("Zmienna zależna (Y):", target_var, "\n")
+cat("Predyktory ilościowe:", paste(num_preds, collapse = ", "), "\n")
+cat("Predyktory jakościowe:", cat_preds, "\n")
+```
+
+Zamieniamy `pochodzenie` z typu `character` na **factor** - R traktuje
+go wtedy jako zmienną jakościową z ustalonymi poziomami (Ameryka, Azja,
+Europa). Dzięki temu `recipe` automatycznie rozpozna tę kolumnę jako
+kategoryczną i zastosuje odpowiednie kodowanie (`step_dummy`), a wykresy
+grupujące dostaną poprawną legendę bez dodatkowej konfiguracji.
+
+```{r coerce-types}
+df <- df %>%
+  mutate(pochodzenie = factor(pochodzenie))
+```
+
+------------------------------------------------------------------------
+
+# Eksploracyjna analiza danych (EDA)
+
+## Raport braków danych
+
+```{r missing-report}
+tibble(
+  variable    = names(df),
+  n_missing   = map_int(df, ~ sum(is.na(.x))),
+  pct_missing = map_dbl(df, ~ round(mean(is.na(.x)) * 100, 2))
+) %>%
+  filter(n_missing > 0)
+```
+
+W tym zbiorze **nie ma braków danych** - nie musimy imputować. To
+wyjątkowa sytuacja; w praktyce pierwszy krok po EDA to niemal zawsze
+obsługa NA.
+
+## Rozkład zmiennej zależnej
+
+```{r target-distribution, fig.height = 4}
+p_hist <- ggplot(df, aes(x = zuzycie)) +
+  geom_histogram(bins = 30, fill = "#4C78A8", colour = "white") +
+  labs(title = "Rozkład zużycia paliwa", x = "Zużycie (l/100 km)",
+       y = "Liczebność") +
+  theme_minimal()
+
+p_box <- ggplot(df, aes(y = zuzycie, x = "")) +
+  geom_boxplot(width = 0.3, fill = "#A8C5DA", outlier.colour = "red") +
+  geom_jitter(width = 0.08, alpha = 0.25, size = 1) +
+  labs(title = "Boxplot zużycia", x = NULL, y = "l/100 km") +
+  theme_minimal()
+
+p_hist + p_box
+```
+
+Rozkład jest **prawostronnie skośny** - wiele aut o niskim zużyciu,
+kilka „paliwożernych" modeli. Transformacja logarytmiczna mogłaby pomóc
+regresji liniowej (stabilizacja wariancji reszt). Modele drzewiaste nie
+wymagają takiej transformacji.
+
+## Rozkłady predyktorów ilościowych
+
+```{r predictor-histograms, fig.height = 7}
+df %>%
+  dplyr::select(all_of(num_preds)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 30, fill = "#4C78A8", colour = "white") +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  labs(title = "Rozkłady predyktorów ilościowych") +
+  theme_minimal(base_size = 10)
+```
+
+```{r predictor-boxplots, fig.height = 7}
+df %>%
+  dplyr::select(all_of(num_preds)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot(fill = "#A8C5DA", outlier.colour = "red") +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  labs(title = "Boxploty predyktorów — analiza outlierów") +
+  theme_minimal(base_size = 10)
+```
+
+## Rozkład zmiennej jakościowej
+
+```{r categorical-distribution, fig.height = 3.5}
+df %>%
+  count(pochodzenie) %>%
+  ggplot(aes(x = reorder(pochodzenie, -n), y = n, fill = pochodzenie)) +
+  geom_col(show.legend = FALSE, colour = "black") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Rozkład pochodzenia samochodów",
+       x = "Pochodzenie", y = "Liczebność") +
+  theme_minimal()
+```
+
+## Korelacje między zmiennymi ilościowymi
+
+W tym przykładzie do oceny zależności pomiędzy zmiennymi wykorzystujemy
+korelację Spearmana, a nie korelację Pearsona. Korelacja Spearmana jest
+oparta na rangach, dlatego jest mniej wrażliwa na wartości odstające i
+nie wymaga tak silnych założeń dotyczących rozkładu zmiennych. Dodatkowo
+pozwala wykrywać zależności monotoniczne, czyli takie, w których wraz ze
+wzrostem jednej zmiennej druga ma tendencję do wzrostu lub spadku, nawet
+jeśli zależność nie jest idealnie liniowa. Jest to szczególnie przydatne
+na etapie eksploracyjnej analizy danych, gdy nie mamy jeszcze pewności,
+jaki charakter mają relacje pomiędzy zmiennymi.
+
+```{r correlation-matrix, fig.height = 6}
+cor_mat <- cor(df %>% dplyr::select(all_of(c(target_var, num_preds))),
+               method = "spearman")
+
+corrplot(cor_mat,
+         method      = "color",
+         type        = "upper",
+         order       = "hclust",
+         addCoef.col = "black",
+         number.cex  = 0.7,
+         tl.cex      = 0.8,
+         tl.col      = "black",
+         title       = "Korelacja Spearmana",
+         mar         = c(0, 0, 2, 0))
+```
+
+⚠️ **Pułapka - współliniowość:** zmienne `pojemnosc`, `cylindry`, `masa`
+i `moc` są silnie wzajemnie skorelowane, czyli niosą bardzo podobną
+informację o samochodzie. W regresji liniowej może to powodować
+niestabilność współczynników oraz tzw. **odwrócenie znaków** - na
+przykład zmienna, która analizowana osobno wydaje się zwiększać zużycie
+paliwa, w modelu wielowymiarowym może otrzymać współczynnik ujemny, bo
+model „rozlicza” jej efekt po uwzględnieniu innych, podobnych zmiennych.
+Nie musi to oznaczać realnej zależności przyczynowej, tylko problem z
+jednoznacznym oddzieleniem wpływu mocno powiązanych predyktorów. LASSO
+częściowo rozwiązuje ten problem automatycznie, ponieważ może zerować
+redundantne zmienne, natomiast modele drzewiaste są zwykle mniej
+wrażliwe na kolinearność predyktorów.
+
+## Wykresy rozrzutu: predyktory vs zużycie
+
+```{r scatter-plots, fig.height = 8}
+df %>%
+  dplyr::select(all_of(c(target_var, num_preds))) %>%
+  pivot_longer(-zuzycie, names_to = "predictor", values_to = "value") %>%
+  ggplot(aes(x = value, y = zuzycie)) +
+  geom_point(alpha = 0.4, colour = "#4C78A8") +
+  geom_smooth(method = "loess", se = FALSE, colour = "red", linewidth = 0.8) +
+  facet_wrap(~ predictor, scales = "free_x", ncol = 3) +
+  labs(title = "Zależność zużycia od predyktorów",
+       x = "Wartość predyktora", y = "Zużycie (l/100 km)") +
+  theme_minimal(base_size = 10)
+```
+
+## Zużycie w przekroju pochodzenia
+
+```{r boxplot-by-origin, fig.height = 4}
+ggplot(df, aes(x = pochodzenie, y = zuzycie, fill = pochodzenie)) +
+  geom_boxplot(show.legend = FALSE, outlier.colour = "red") +
+  geom_jitter(width = 0.15, alpha = 0.2, size = 1) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Zużycie paliwa wg pochodzenia",
+       x = "Pochodzenie", y = "l/100 km") +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
+
+# Podział na zbiór treningowy i testowy
+
+> **📖 Przypomnienie teoretyczne - dlaczego dzielimy dane?**
+>
+> Model oceniany na danych, na których był trenowany, daje
+> **optymistyczną** ocenę (bo „widział" te dane). Odłożony zbiór testowy
+> symuluje nowe, niewidziane dane - daje uczciwą ocenę zdolności
+> generalizacji.
+>
+> Proporcja 80/20 to popularna reguła kciuka. W tidymodels używamy
+> `initial_split()`, który zapewnia **losowy, ale powtarzalny** podział
+> (dzięki `set.seed()`).
+
+```{r train-test-split}
+set.seed(42)
+
+data_split <- initial_split(df %>% dplyr::select(-all_of(id_vars)),
+                            prop = 0.80,
+                            strata = zuzycie)  # stratyfikacja po Y
+
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+cat("Zbiór treningowy:", nrow(train_data), "obserwacji\n")
+cat("Zbiór testowy:   ", nrow(test_data), "obserwacji\n")
+```
+
+## Definicja foldów do walidacji krzyżowej
+
+```{r cv-folds}
+cv_folds <- vfold_cv(train_data, v = 5, repeats = 3, strata = zuzycie)
+
+cv_folds
+```
+
+> **📖 Walidacja krzyżowa (v-fold CV)**
+>
+> Dane treningowe dzielimy na $v$ części (foldów). Model trenujemy na
+> $v-1$ częściach, testujemy na 1. Powtarzamy $v$ razy. Uśrednione
+> metryki dają stabilną ocenę generalizacji bez „zużywania" zbioru
+> testowego. Stratyfikacja po zmiennej `zuzycie` zapewnia, że każdy fold
+> ma podobny rozkład zmiennej zależnej.
+>
+> Stosujemy **powtórzoną** walidację krzyżową (`repeats = 3`), co
+> oznacza trzykrotne powtórzenie losowego podziału na 5 foldów (łącznie
+> 15 iteracji). Pojedynczy 5-fold CV zależy od jednego konkretnego
+> podziału danych - powtórzenia uśredniają ten efekt i dają
+> stabilniejsze estymaty metryk.
+
+------------------------------------------------------------------------
+
+# Preprocessing z recipes
+
+> **📖 Przypomnienie teoretyczne — dlaczego `recipe`, a nie ręczne
+> transformacje?**
+>
+> `recipe` definiuje **co** chcemy zrobić z danymi, ale **nie robi tego
+> od razu**. Parametry (np. mediany, kwartyle, średnie) są obliczane
+> dopiero na zbiorze treningowym w momencie `fit()`. Dzięki temu zbiór
+> testowy **nigdy nie wpływa** na transformację - to eliminuje wyciek
+> danych (*data leakage*).
+
+> **⚠️ Pułapka - data leakage:** Jeśli policzysz średnią do
+> standaryzacji na **całych** danych (przed podziałem train/test), to
+> informacja ze zbioru testowego „przecieka" do treningu. Wynik na
+> teście będzie optymistyczny, ale model gorzej zadziała w produkcji.
+> `recipe` chroni przed tym automatycznie.
+
+## Definicja przepisu (recipe)
+
+**📖 Po co standaryzacja w regresji?**
+
+Standaryzacja (z-score) w regresji liniowej i LASSO pełni dwie funkcje:
+
+1.  **Porównywalność współczynników** - bez standaryzacji współczynnik
+    przy `moc` (zakres 46–230 KM) i przy przysp (zakres \~8–25 s) mają
+    nieporównywalne skale. Po standaryzacji każdy współczynnik mówi: „o
+    ile zmieni się Y, gdy X wzrośnie o jedno odchylenie standardowe" -
+    można je zestawić obok siebie i ocenić, która zmienna ma
+    najsilniejszy wpływ.
+
+2.  **Poprawne działanie regularyzacji** - LASSO nakłada karę
+    proporcjonalną do sumy wartości bezwzględnych współczynników (α ·
+    Σ\|βⱼ\|). Jeśli zmienne mają różne skale, kara uderza nierówno
+
+    -   zmienna o dużym zakresie ma „naturalnie" mały współczynnik i
+        unika kary, a zmienna o małym zakresie jest niesprawiedliwie
+        karana. Standaryzacja wyrównuje szanse.
+
+Dla samego dopasowania OLS (R², RMSE) standaryzacja **nie zmienia
+wyniku** - predykcje będą identyczne. Zmienia się jedynie interpretacja
+współczynników. Natomiast dla LASSO jest **obowiązkowa** - bez niej
+selekcja zmiennych będzie zaburzona.
+
+```{r recipe-definition}
+base_recipe <- recipe(zuzycie ~ ., data = train_data) %>%
+
+  # --- Rola zmiennych ---
+  # (wszystkie poza zuzycie są predyktorami — recipe robi to domyślnie)
+
+  # --- Wartości odstające: winsoryzacja IQR ---
+  # Granice są estymowane w prep() na danych uczących i zapamiętywane.
+  # Następnie bake() stosuje te same granice do danych walidacyjnych/testowych.
+  step_winsorize_iqr(pojemnosc, moc, masa, przysp, multiplier = 1.5) %>%
+
+  # --- Kodowanie zmiennej jakościowej (one-hot, drop first) ---
+  step_dummy(all_nominal_predictors(), one_hot = FALSE) %>%
+
+  # --- Usunięcie predyktorów o zerowej wariancji ---
+  step_zv(all_predictors()) %>%
+
+  # --- Standaryzacja z-score ---
+  step_normalize(all_numeric_predictors())
+
+base_recipe
+```
+
+Winsoryzację stosujemy wyłącznie do zmiennych ciągłych (`pojemnosc`,
+`moc`, `masa`, `przysp`), a nie do wszystkich predyktorów numerycznych.
+Zmienna `rok` jest serią czasową, w której skrajne wartości oznaczają po
+prostu najstarsze i najnowsze roczniki - ich przycinanie zafałszowałoby
+trend. Z kolei `cylindry` przyjmuje tylko kilka dyskretnych wartości (3,
+4, 5, 6, 8), więc pojęcie odstającego punktu w sensie IQR nie ma tu
+zastosowania.
+
+### Podgląd efektów recipe
+
+Funkcja `prep()` „uczy" przepis na zbiorze treningowym - oblicza
+wszystkie potrzebne parametry: granice IQR do winsoryzacji, poziomy
+zmiennych jakościowych do kodowania oraz średnie i odchylenia do
+standaryzacji. Funkcja `bake()` **stosuje** wyuczony przepis do
+wskazanych danych - tu podajemy `train_data`, żeby podejrzeć efekt, ale
+moglibyśmy podać `test_data` i transformacja użyłaby parametrów
+obliczonych wyłącznie na treningu.
+
+W normalnym workflow **nie wywołujemy** `prep()` i `bake()` ręcznie -
+robi to za nas `fit()` wewnątrz workflow. Robimy to tutaj w celach
+dydaktycznych: `glimpse(baked)` pozwala sprawdzić, czy zmienne zostały
+poprawnie zakodowane (dummy), przeskalowane (z-score) i czy nie pojawiły
+się niespodziewane kolumny lub wartości NA.
+
+```{r recipe-preview}
+prepped <- prep(base_recipe, training = train_data)
+baked   <- bake(prepped, new_data = train_data)
+
+glimpse(baked)
+```
+
+```{r winsorization-limits}
+tidy(prepped, number = 1) %>%
+  kable(digits = 2,
+        caption = "Granice winsoryzacji obliczone na zbiorze treningowym")
+```
+
+> W podejściu tidymodels **nie musimy** wywoływać `prep()` i `bake()`
+> ręcznie - workflow robi to automatycznie. Robimy to tutaj wyłącznie w
+> celach dydaktycznych, żeby sprawdzić efekt transformacji.
+
+### Wersja recipe bez standaryzacji (dla drzew)
+
+Modele drzewiaste nie wymagają standaryzacji - skale zmiennych nie
+wpływają na podziały. Definiujemy osobny recipe:
+
+```{r recipe-trees}
+tree_recipe <- recipe(zuzycie ~ ., data = train_data) %>%
+  step_winsorize_iqr(pojemnosc, moc, masa, przysp, multiplier = 1.5) %>%
+  step_dummy(all_nominal_predictors(), one_hot = FALSE) %>%
+  step_zv(all_predictors())
+```
+
+------------------------------------------------------------------------
+
+# Zbiór metryk do ewaluacji
+
+Definiujemy raz - używamy wszędzie:
+
+```{r metric-set}
+reg_metrics <- metric_set(rmse, rsq, mae, mape)
+```
+
+------------------------------------------------------------------------
+
+# Model 1: Regresja liniowa (OLS)
+
+> **📖 Przypomnienie teoretyczne — regresja liniowa**
+>
+> Regresja liniowa szuka współczynników $\beta_0, \beta_1, \ldots,
+> \beta_p$ minimalizujących sumę kwadratów reszt:
+>
+> $$ \hat{y} = \beta_0 + \beta_1 x_1 + \ldots + \beta_p x_p $$
+>
+> Założenia: liniowość zależności, normalność reszt, stałość wariancji
+> (homoscedastyczność), brak silnej współliniowości. Naruszenie założeń
+> nie unieważnia modelu, ale wpływa na wiarygodność przedziałów ufności
+> i p-wartości.
+
+## Specyfikacja modelu i workflow
+
+W tym kroku definiujemy typ modelu regresji liniowej oraz łączymy go z
+przygotowanym wcześniej przepisem przetwarzania danych (`base_recipe`) w
+jeden obiekt `workflow`, który będzie można trenować i oceniać w
+uporządkowany sposób.
+
+```{r lm-spec}
+lm_spec <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression")
+
+lm_wf <- workflow() %>%
+  add_recipe(base_recipe) %>%
+  add_model(lm_spec)
+
+lm_wf
+```
+
+## Walidacja krzyżowa
+
+W tym kroku oceniamy model regresji liniowej za pomocą walidacji
+krzyżowej: model jest wielokrotnie trenowany na części danych
+treningowych i sprawdzany na pozostałej części, dzięki czemu otrzymujemy
+bardziej stabilną ocenę jakości niż przy pojedynczym podziale danych.
+
+```{r lm-cv}
+lm_cv <- fit_resamples(
+  lm_wf,
+  resamples = cv_folds,
+  metrics   = reg_metrics,
+  control   = control_resamples(save_pred = TRUE)
+)
+
+collect_metrics(lm_cv)
+```
+
+## Dopasowanie na pełnym zbiorze treningowym
+
+Po ocenie modelu za pomocą walidacji krzyżowej dopasowujemy regresję
+liniową na całym zbiorze treningowym, aby uzyskać finalne współczynniki
+modelu. Ponieważ predyktory numeryczne zostały wcześniej
+wystandaryzowane, wartości współczynników można łatwiej porównywać
+między sobą pod względem siły związku ze zmienną objaśnianą.
+
+```{r lm-fit}
+lm_fit <- fit(lm_wf, data = train_data)
+
+# Współczynniki modelu
+lm_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  arrange(desc(abs(estimate))) %>%
+  kable(caption = "Współczynniki regresji liniowej (dane standaryzowane)",
+        digits = 4)
+```
+
+W tabeli warto zwrócić uwagę nie tylko na istotność statystyczną, ale
+także na znaki współczynników. Część z nich jest intuicyjna: większa
+`masa` i większa `moc` wiążą się z większym zużyciem paliwa, a nowszy
+`rok` produkcji z mniejszym zużyciem. Pojawiają się jednak również
+wyniki pozornie kontrintuicyjne: `pojemnosc` ma współczynnik ujemny, a
+`przysp` dodatni. Nie należy interpretować ich jako prostych zależności
+„sam na sam”, ponieważ model uwzględnia wszystkie zmienne jednocześnie.
+Przy silnej współliniowości między `pojemnosc`, `cylindry`, `masa` i
+`moc` model może mieć trudność z jednoznacznym przypisaniem wpływu
+poszczególnym predyktorom, co prowadzi do niestabilnych lub odwróconych
+znaków współczynników.
+
+```{r lm-train-predictions}
+lm_train_pred <- lm_fit %>%
+  augment(new_data = train_data)
+```
+
+## Diagnostyka reszt
+
+Diagnostyka reszt pozwala sprawdzić, czy model liniowy dobrze opisuje
+strukturę danych. Na wykresie „obserwowane vs przewidywane” punkty
+powinny układać się możliwie blisko czerwonej linii przerywanej — im
+większe odchylenia od tej linii, tym większe błędy predykcji. Drugi
+wykres pokazuje reszty względem wartości przewidywanych. W idealnej
+sytuacji reszty powinny być rozproszone losowo wokół zera, bez wyraźnego
+wzorca. Jeżeli pojawia się łuk, wachlarz albo grupowanie punktów, może
+to sugerować nieliniowość, heteroskedastyczność albo obecność obserwacji
+nietypowych.
+
+```{r lm-residuals, fig.height = 5}
+p_obs_pred <- ggplot(lm_train_pred, aes(x = zuzycie, y = .pred)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(colour = "red", linetype = "dashed") +
+  labs(title = "Obserwowane vs przewidywane",
+       x = "Obserwowane", y = "Przewidywane") +
+  theme_minimal()
+
+p_resid <- ggplot(lm_train_pred, aes(x = .pred, y = zuzycie - .pred)) +
+  geom_point(alpha = 0.4) +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(title = "Reszty vs przewidywane",
+       x = "Przewidywane", y = "Reszta") +
+  theme_minimal()
+
+p_obs_pred + p_resid
+```
+
+------------------------------------------------------------------------
+
+# Model 2: Regresja LASSO
+
+> **📖 Przypomnienie teoretyczne - regularyzacja LASSO (L1)**
+>
+> LASSO minimalizuje:
+>
+> $$ \sum(y_i - \hat{y}_i)^2 + \alpha \sum_{j=1}^{p} |\beta_j| $$
+>
+> Kara $\alpha$ „ściska" współczynniki ku zeru. Wystarczająco duża
+> $\alpha$ powoduje, że część współczynników wyniesie **dokładnie
+> zero** - LASSO działa więc jak automatyczna selekcja zmiennych.
+>
+> Hiperparametr `penalty` ($\alpha$) dobieramy przez tuning.
+> `mixture = 1` oznacza czyste LASSO (mixture = 0 to Ridge, 0 \< m \< 1
+> to Elastic Net).
+
+## Specyfikacja ze strojeniem
+
+W tym kroku definiujemy model LASSO, czyli regresję liniową z
+regularyzacją L1, która może zmniejszać część współczynników dokładnie
+do zera i tym samym wykonywać selekcję zmiennych. Hiperparametr
+`penalty` nie jest ustawiany ręcznie, lecz oznaczony jako `tune()`,
+ponieważ jego optymalną wartość dobierzemy później na podstawie
+walidacji krzyżowej.
+
+```{r lasso-spec}
+lasso_spec <- linear_reg(
+  penalty = tune(),    # strojony hiperparametr
+  mixture = 1          # LASSO (L1)
+) %>%
+  set_engine("glmnet") %>%
+  set_mode("regression")
+
+lasso_wf <- workflow() %>%
+  add_recipe(base_recipe) %>%
+  add_model(lasso_spec)
+```
+
+## Siatka wartości penalty
+
+Tworzymy siatkę wartości parametru `penalty`, czyli siły regularyzacji w
+modelu LASSO. Podczas walidacji krzyżowej model zostanie przetestowany
+dla wielu różnych wartości tej kary, aby wybrać taką, która daje
+najlepszą jakość predykcji.
+
+```{r lasso-grid}
+lasso_grid <- grid_regular(
+  penalty(range = c(-4, 0)),  # 10^(-4) do 10^0
+  levels = 30
+)
+```
+
+## Strojenie przez v-fold CV
+
+W tym kroku uruchamiamy strojenie modelu LASSO: dla każdej wartości
+parametru `penalty` z wcześniej utworzonej siatki model jest oceniany w
+walidacji krzyżowej. Dzięki temu możemy sprawdzić, jaka siła
+regularyzacji daje najlepszy kompromis między dokładnością predykcji a
+uproszczeniem modelu.
+
+```{r lasso-tune}
+lasso_tune <- tune_grid(
+  lasso_wf,
+  resamples = cv_folds,
+  grid      = lasso_grid,
+  metrics   = reg_metrics,
+  control   = control_grid(save_pred = TRUE)
+)
+```
+
+### Wizualizacja ścieżki strojenia
+
+```{r lasso-tune-plot, fig.height = 4}
+autoplot(lasso_tune) +
+  labs(title = "LASSO: metryki w funkcji penalty (α)") +
+  theme_minimal()
+```
+
+Na wykresie widać, że dla małych i umiarkowanych wartości `penalty`
+jakość modelu jest bardzo podobna - wartości błędów (`MAE`, `MAPE`,
+`RMSE`) pozostają prawie płaskie, a `R²` tylko nieznacznie się zmienia.
+Dopiero przy zbyt dużej regularyzacji błędy zaczynają szybko rosnąć, a
+`R²` spada, co oznacza, że model staje się zbyt mocno uproszczony i
+traci zdolność dobrego przewidywania zużycia paliwa.
+
+### Wybór najlepszego penalty
+
+```{r lasso-best}
+lasso_best <- select_by_one_std_err(
+  lasso_tune,
+  metric = "rmse",
+  desc(penalty)
+)
+lasso_best
+
+lasso_final_wf <- finalize_workflow(lasso_wf, lasso_best)
+lasso_fit <- fit(lasso_final_wf, data = train_data)
+```
+
+Dla LASSO stosujemy **regułę jednego błędu standardowego** (*1-SE
+rule*), a nie `select_best()`. Wybieramy najwyższą wartość `penalty`,
+której RMSE mieści się w granicach 1 SE od bezwzględnie najlepszego
+wyniku. Silniejsza kara oznacza więcej wyzerowanych współczynników, a
+więc prostszy model - i to jest tu celem: chcemy zobaczyć, które zmienne
+LASSO uzna za zbędne w porównaniu z pełnym modelem OLS.
+
+Dla CART i XGBoost stosujemy `select_best()`, bo tam prostota modelu
+jest kontrolowana bezpośrednio przez hiperparametry strukturalne
+(głębokość drzewa, `min_n`), a nie przez mechanizm zerowania zmiennych.
+
+### Które zmienne zostały wyzerowane?
+
+```{r lasso-coefficients}
+lasso_coefs <- lasso_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(estimate)))
+
+kable(lasso_coefs,
+      caption = "Współczynniki LASSO (niezerowe = wybrane przez model)",
+      digits = 4)
+
+cat("\nLiczba wyzerowanych zmiennych:",
+    sum(lasso_coefs$estimate == 0), "/", nrow(lasso_coefs), "\n")
+```
+
+### Metryki CV dla LASSO
+
+```{r lasso-cv-metrics}
+lasso_cv_metrics <- lasso_tune %>%
+  collect_metrics() %>%
+  filter(.config == lasso_best$.config)
+
+lasso_cv_metrics
+```
+
+------------------------------------------------------------------------
+
+# Model 3: Drzewo regresyjne (CART)
+
+> **📖 Przypomnienie teoretyczne - drzewa decyzyjne (CART)**
+>
+> Drzewo rekurencyjnie dzieli przestrzeń predyktorów na prostokątne
+> regiony. W każdym węźle szuka zmiennej i progu, które minimalizują
+> sumę kwadratów reszt w powstałych podgrupach.
+>
+> Kluczowe hiperparametry:
+>
+> | Parametr | Znaczenie |
+> |------------------------------------|------------------------------------|
+> | `tree_depth` | maks. głębokość drzewa |
+> | `min_n` | min. obserwacji w liściu |
+> | `cost_complexity` | parametr przycinania (cp) - im większy, tym prostsze drzewo |
+>
+> **Zalety:** interpretowalność, brak założeń o rozkładach, odporność na
+> kolinearność. **Wady:** tendencja do przeuczenia, niestabilność (mała
+> zmiana danych → inne drzewo).
+
+## Specyfikacja ze strojeniem
+
+W tym kroku definiujemy model drzewa regresyjnego CART, w którym
+strojone będą trzy hiperparametry: maksymalna głębokość drzewa
+(`tree_depth`), minimalna liczba obserwacji w liściu (`min_n`) oraz siła
+przycinania drzewa (`cost_complexity`). W workflow używamy osobnego
+przepisu `tree_recipe`, ponieważ modele drzewiaste nie wymagają
+standaryzacji zmiennych - podziały są wykonywane na podstawie progów
+wartości, a nie na podstawie odległości czy wielkości współczynników.
+
+```{r cart-spec}
+cart_spec <- decision_tree(
+  tree_depth      = tune(),
+  min_n           = tune(),
+  cost_complexity = tune()
+) %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+
+cart_wf <- workflow() %>%
+  add_recipe(tree_recipe) %>%    # bez standaryzacji
+
+  add_model(cart_spec)
+```
+
+## Siatka hiperparametrów
+
+```{r cart-grid}
+cart_grid <- grid_regular(
+  tree_depth(range = c(2, 8)),
+  min_n(range = c(2, 20)),
+  cost_complexity(range = c(-4, -1)),
+  levels = 4
+)
+
+cat("Kombinacji do przeszukania:", nrow(cart_grid), "\n")
+```
+
+## Strojenie
+
+```{r cart-tune}
+cart_tune <- tune_grid(
+  cart_wf,
+  resamples = cv_folds,
+  grid      = cart_grid,
+  metrics   = reg_metrics,
+  control   = control_grid(save_pred = TRUE)
+)
+```
+
+```{r cart-tune-plot, fig.height = 5}
+autoplot(cart_tune) +
+  labs(title = "CART: metryki w funkcji hiperparametrów") +
+  theme_minimal()
+```
+
+### Najlepszy model CART
+
+```{r cart-best}
+cart_best <- select_best(cart_tune, metric = "rmse")
+cart_best
+
+cart_final_wf <- finalize_workflow(cart_wf, cart_best)
+cart_fit <- fit(cart_final_wf, data = train_data)
+```
+
+### Wizualizacja drzewa
+
+```{r cart-plot, fig.height = 6, fig.width = 10}
+cart_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot(roundint = FALSE,
+             type = 4,
+             extra = 101,
+             fallen.leaves = TRUE,
+             main = "Drzewo regresyjne (CART) — najlepsze hiperparametry")
+```
+
+------------------------------------------------------------------------
+
+# Model 4: XGBoost
+
+> **📖 Przypomnienie teoretyczne — Gradient Boosting (XGBoost)**
+>
+> XGBoost buduje **sekwencję** drzew, z których każde kolejne koryguje
+> błędy poprzednich. Proces:
+>
+> 1.  Dopasuj proste drzewo do danych.
+> 2.  Oblicz reszty (błędy).
+> 3.  Dopasuj następne drzewo **do reszt**.
+> 4.  Dodaj je do ensemblu z wagą `learning_rate`.
+> 5.  Powtarzaj.
+>
+> Kluczowe hiperparametry:
+>
+> | Parametr         | tidymodels       | Znaczenie                              |
+> |--------------------|--------------------|--------------------------------|
+> | n_estimators     | `trees`          | liczba drzew w ensemblu                |
+> | max_depth        | `tree_depth`     | głębokość pojedynczego drzewa          |
+> | learning_rate    | `learn_rate`     | tempo uczenia                          |
+> | subsample        | `sample_size`    | \% obserwacji na drzewo                |
+> | colsample_bytree | `mtry`           | \% zmiennych na drzewo                 |
+> | min_child_weight | `min_n`          | min. obserwacji w liściu               |
+> | gamma            | `loss_reduction` | min. redukcja straty do podziału węzła |
+
+## Specyfikacja ze strojeniem
+
+```{r xgb-spec}
+xgb_spec <- boost_tree(
+  trees      = tune(),
+  tree_depth = tune(),
+  learn_rate = tune(),
+  min_n      = tune(),
+  sample_size = 0.8,
+  mtry        = tune()
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+xgb_wf <- workflow() %>%
+  add_recipe(tree_recipe) %>%    # bez standaryzacji
+  add_model(xgb_spec)
+```
+
+## Siatka hiperparametrów
+
+```{r xgb-grid}
+xgb_grid <- grid_space_filling(
+  trees(range = c(80, 300)),
+  tree_depth(range = c(2, 6)),
+  learn_rate(range = c(-2, -0.5)),   # 0.01 – 0.3
+  min_n(range = c(2, 10)),
+  finalize(mtry(), bake(prep(tree_recipe, train_data), train_data) %>%
+           dplyr::select(-zuzycie)),
+  size = 40
+)
+
+cat("Kombinacji do przeszukania:", nrow(xgb_grid), "\n")
+```
+
+> 📖 **Siatka space-filling** - w przeciwieństwie do regularnej siatki
+> (`grid_regular()`), metoda ta dobiera punkty tak, aby możliwie dobrze
+> pokryć przestrzeń hiperparametrów przy ograniczonej liczbie prób.
+> Dzięki temu np. 40 punktów może dać bardziej użyteczne pokrycie
+> przestrzeni niż 40 kombinacji z prostej regularnej siatki, szczególnie
+> gdy stroimy kilka hiperparametrów jednocześnie.
+
+## Strojenie
+
+```{r xgb-tune}
+xgb_tune <- tune_grid(
+  xgb_wf,
+  resamples = cv_folds,
+  grid      = xgb_grid,
+  metrics   = reg_metrics,
+  control   = control_grid(save_pred = TRUE)
+)
+```
+
+```{r xgb-tune-plot, fig.height = 5}
+autoplot(xgb_tune) +
+  labs(title = "XGBoost: metryki w funkcji hiperparametrów") +
+  theme_minimal()
+```
+
+### Najlepszy model XGBoost
+
+```{r xgb-best}
+xgb_best <- select_best(xgb_tune, metric = "rmse")
+xgb_best
+
+xgb_final_wf <- finalize_workflow(xgb_wf, xgb_best)
+xgb_fit <- fit(xgb_final_wf, data = train_data)
+```
+
+------------------------------------------------------------------------
+
+# Porównanie modeli - metryki z walidacji krzyżowej
+
+## Zebranie metryk
+
+```{r collect-all-cv}
+
+# Dla LASSO i drzew bierzemy najlepszą konfigurację
+lasso_best_cv <- lasso_tune %>%
+  collect_metrics() %>%
+  filter(.config == lasso_best$.config) %>%
+  mutate(model = "LASSO")
+
+cart_best_cv <- cart_tune %>%
+  collect_metrics() %>%
+  filter(.config == cart_best$.config) %>%
+  mutate(model = "CART")
+
+xgb_best_cv <- xgb_tune %>%
+  collect_metrics() %>%
+  filter(.config == xgb_best$.config) %>%
+  mutate(model = "XGBoost")
+
+lm_cv_metrics <- collect_metrics(lm_cv) %>%
+  mutate(model = "OLS")
+
+all_cv <- bind_rows(lm_cv_metrics, lasso_best_cv, cart_best_cv, xgb_best_cv) %>%
+  dplyr::select(model, .metric, mean, std_err) %>%
+  arrange(.metric, mean)
+```
+
+```{r cv-comparison-table}
+all_cv %>%
+  pivot_wider(names_from = .metric,
+              values_from = c(mean, std_err)) %>%
+  kable(caption = "Porównanie modeli — metryki CV (średnia ± SE)",
+        digits = 4)
+```
+
+## Wizualizacja porównania
+
+```{r cv-comparison-plot, fig.height = 5}
+all_cv %>%
+  ggplot(aes(x = mean, y = model, fill = model)) +
+  geom_col(show.legend = FALSE, colour = "black") +
+  geom_errorbar(
+    aes(xmin = mean - std_err, xmax = mean + std_err),
+    width = 0.2
+  ) +
+  facet_wrap(~ .metric, scales = "free_x", ncol = 2) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Porównanie modeli — walidacja krzyżowa (5-fold x3)",
+       x = "Wartość metryki", y = NULL) +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
+
+# Ewaluacja na zbiorze testowym
+
+> **⚠️ Pułapka - zbiór testowy otwieramy TYLKO RAZ.** Wielokrotna
+> ewaluacja na teście prowadzi do „optymizmu selekcyjnego" - efekt jest
+> taki sam jak brak podziału. Wybraliśmy model na podstawie CV; teraz
+> sprawdzamy go na teście po raz pierwszy i ostatni.
+
+Na potrzeby tego materiału ewaluację na zbiorze testowym przeprowadzamy
+na modelu XGBoost, ponieważ dalsza część analizy (wartości SHAP)
+korzysta bezpośrednio z natywnego API tego silnika. W pełni
+zautomatyzowanym pipeline produkcyjnym wybór modelu powinien być
+programowy - np. na podstawie najniższego RMSE z tabeli `all_cv`.
+
+```{r test-evaluation}
+# Wybieramy najlepszy model (na podstawie RMSE z CV) — tu zakładamy XGBoost
+final_fit <- last_fit(xgb_final_wf, split = data_split, metrics = reg_metrics)
+
+collect_metrics(final_fit) %>%
+  kable(caption = "Metryki na zbiorze testowym (najlepszy model)",
+        digits = 4)
+```
+
+## Wykres obserwowane vs przewidywane (test)
+
+```{r test-obs-pred, fig.height = 5}
+test_pred <- collect_predictions(final_fit)
+
+ggplot(test_pred, aes(x = zuzycie, y = .pred)) +
+  geom_point(alpha = 0.5, colour = "#4C78A8") +
+  geom_abline(colour = "red", linetype = "dashed") +
+  labs(title = "Najlepszy model: obserwowane vs przewidywane (TEST)",
+       x = "Obserwowane (l/100 km)", y = "Przewidywane") +
+  theme_minimal()
+```
+
+## Rozkład reszt na zbiorze testowym
+
+```{r test-residuals, fig.height = 4}
+test_pred <- test_pred %>%
+  mutate(residual = zuzycie - .pred)
+
+p_hist_r <- ggplot(test_pred, aes(x = residual)) +
+  geom_histogram(bins = 25, fill = "#4C78A8", colour = "white") +
+  geom_vline(xintercept = 0, colour = "red", linetype = "dashed") +
+  labs(title = "Rozkład reszt (test)", x = "Reszta", y = "Liczebność") +
+  theme_minimal()
+
+p_resid_pred <- ggplot(test_pred, aes(x = .pred, y = residual)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(title = "Reszty vs przewidywane (test)",
+       x = "Przewidywane", y = "Reszta") +
+  theme_minimal()
+
+p_hist_r + p_resid_pred
+```
+
+------------------------------------------------------------------------
+
+# Interpretowalność modelu
+
+## Analiza SHAP (\*)
+
+Ta sekcja jest pokazowa. Jeśli wystąpi problem z pakietem `shapviz`, nie
+blokuje to wykonania głównych zadań.
+
+> **📖 Przypomnienie teoretyczne — SHAP**
+>
+> SHAP (*SHapley Additive exPlanations*) pokazuje, jak poszczególne
+> zmienne wpływają na predykcję modelu dla konkretnej obserwacji.
+> Punktem odniesienia jest wartość bazowa modelu, czyli przeciętna
+> predykcja modelu dla danych referencyjnych.
+>
+> Dla pojedynczej obserwacji predykcję można zapisać intuicyjnie jako:
+>
+> $$\text{predykcja} = \text{wartość bazowa} + \sum \text{wkładów SHAP}$$
+>
+> -   **SHAP \> 0** — dana cecha podwyższa predykcję względem wartości
+>     bazowej.
+> -   **SHAP \< 0** — dana cecha obniża predykcję względem wartości
+>     bazowej.
+> -   **\|SHAP\|** — informuje o sile wpływu danej cechy.
+>
+> Wartości SHAP nie są współczynnikami regresji. Nie mówią, że zmienna
+> ma jeden stały wpływ w całym modelu. Pokazują wkład zmiennej w
+> konkretnej predykcji, z uwzględnieniem pozostałych cech obserwacji.
+
+```{r xgb-shap-prepare}
+# Wyciągamy wytrenowany silnik XGBoost z workflow
+xgb_engine <- extract_fit_engine(xgb_fit)
+
+# Wyciągamy przygotowany recipe z finalnego workflow.
+# To ważne: SHAP liczymy na tych samych zmiennych, które widział model,
+# czyli po winsoryzacji, kodowaniu zmiennych jakościowych i usunięciu zmiennych zerowej wariancji.
+xgb_recipe_prepped <- extract_recipe(xgb_fit, estimated = TRUE)
+
+# Przygotowujemy dane treningowe dokładnie tak, jak były przygotowane dla modelu XGBoost
+x_train_baked <- bake(xgb_recipe_prepped, new_data = train_data)
+
+x_train_xgb <- x_train_baked %>%
+  dplyr::select(-zuzycie)
+
+x_train_matrix <- as.matrix(x_train_xgb)
+
+# Natywne wartości SHAP z XGBoost.
+# predcontrib = TRUE zwraca wkłady zmiennych oraz ostatnią kolumnę BIAS,
+# czyli wartość bazową modelu.
+shap_contrib <- predict(
+  xgb_engine,
+  newdata = x_train_matrix,
+  predcontrib = TRUE
+)
+
+# Ostatnia kolumna to BIAS / wartość bazowa.
+# W regresji XGBoost BIAS jest taki sam dla wszystkich obserwacji;
+# używamy średniej, aby nie sugerować, że wybór wiersza ma znaczenie.
+bias_col <- ncol(shap_contrib)
+
+shap_values <- shap_contrib[, -bias_col, drop = FALSE]
+baseline <- mean(shap_contrib[, bias_col])
+
+# Upewniamy się, że nazwy kolumn odpowiadają zmiennym wejściowym modelu.
+colnames(shap_values) <- colnames(x_train_matrix)
+
+# Obiekt shapviz do dalszych wykresów
+shap_obj <- shapviz(
+  shap_values,
+  X = as.data.frame(x_train_xgb),
+  baseline = baseline
+)
+
+cat("Wartość bazowa modelu:", round(baseline, 4), "\n")
+cat("Liczba obserwacji z obliczonym SHAP:", nrow(shap_values), "\n")
+cat("Liczba zmiennych w modelu:", ncol(shap_values), "\n")
+```
+
+Wartości SHAP liczymy tutaj dla wszystkich obserwacji ze zbioru
+treningowego,bez ograniczania się do jednej obserwacji ani do losowej
+próbki. Ważne jest,że używamy danych po przetworzeniu przez `recipe`,
+ponieważ model XGBoost nie pracował bezpośrednio na surowych danych,
+lecz na danych po winsoryzacji, kodowaniu zmiennej `pochodzenie` oraz
+ewentualnym usunięciu zmiennych nieinformatywnych.
+
+```{r xgb-shap-global-bar, fig.height = 5}
+sv_importance(
+  shap_obj,
+  kind = "bar",
+  max_display = 10
+) +
+  labs(
+    title = "XGBoost: globalna ważność zmiennych według SHAP",
+    subtitle = "Średnia wartość bezwzględna SHAP dla wszystkich obserwacji"
+  ) +
+  theme_minimal()
+```
+
+Ten wykres pokazuje globalną ważność zmiennych mierzoną średnią
+wartością bezwzględną SHAP. Im większa średnia wartość \`\|SHAP\|\`, tym
+silniej dana zmienna wpływała na predykcje modelu w całym zbiorze
+treningowym. W przeciwieństwie do pojedynczego wykresu lokalnego, tutaj
+nie analizujemy jednego samochodu, lecz podsumowujemy wpływ zmiennych
+dla wszystkich obserwacji.
+
+```{r xgb-shap-global-beeswarm, fig.height = 6}
+sv_importance(
+  shap_obj,
+  kind = "beeswarm",
+  max_display = 10
+) +
+  labs(
+    title = "XGBoost: rozkład wartości SHAP",
+    subtitle = "Każdy punkt oznacza wkład zmiennej dla jednej obserwacji"
+  ) +
+  theme_minimal()
+```
+
+Wykres typu *beeswarm* pokazuje nie tylko ważność zmiennych, ale także
+kierunek ich wpływu. Każdy punkt odpowiada jednej obserwacji. Położenie
+punktu na osi poziomej informuje, czy dana zmienna zwiększała, czy
+zmniejszała predykcję zużycia paliwa.Ten wykres jest bogatszy niż zwykła
+ważność zmiennych, ponieważ pokazuje również zróżnicowanie wpływu danej
+cechy między obserwacjami. Jeśli punkty są rozrzucone szeroko, oznacza
+to, że wpływ zmiennej silnie zależy od konkretnego samochodu i jego
+kombinacji cech.
+
+# Podsumowanie ścieżki analizy
+
+Przeszliśmy pełną ścieżkę modelowania regresyjnego w ekosystemie
+**tidymodels** - od surowego pliku Excel do zinterpretowanego modelu z
+oceną na zbiorze testowym.
+
+1.  **Wprowadzenie do tidymodels** → zrozumienie filozofii frameworka.
+2.  **EDA** → rozkłady, korelacje, wykresy rozrzutu.
+3.  **Podział train / test** → `initial_split()` ze stratyfikacją.
+4.  **Preprocessing** → `recipe` z winsoryzacją, kodowaniem i
+    standaryzacją (bez wycieku danych!).
+5.  **OLS** → model bazowy, współczynniki, diagnostyka reszt.
+6.  **LASSO** → regularyzacja L1, tuning penalty, selekcja zmiennych.
+7.  **CART** → drzewo regresyjne, tuning 3 hiperparametrów, wizualizacja
+    drzewa.
+8.  **XGBoost** → gradient boosting, siatka space-filling, najlepszy
+    RMSE.
+9.  **Porównanie** → metryki CV w jednej tabeli i na wykresie.
+10. **Test** → `last_fit()` - otwarcie zbioru testowego raz.
+11. **Interpretacja** → SHAP.
+
+## Kluczowe lekcje
+
+-   **tidymodels ujednolica proces** - zmiana modelu to zmiana jednej
+    linijki (`set_engine()`), reszta pipeline'u nie wymaga zmian.
+-   **`recipe` chroni przed wyciekiem danych** - parametry transformacji
+    są estymowane wyłącznie na zbiorze treningowym.
+-   **Współliniowość** to problem OLS, ale nie drzew ani XGBoost. LASSO
+    może ograniczać problem współliniowości przez zmniejszanie lub
+    zerowanie części współczynników, ale nie gwarantuje automatycznego
+    usunięcia wszystkich redundantnych zmiennych.
+-   **Strojenie hiperparametrów** jest konieczne - domyślne ustawienia
+    XGBoost mogą prowadzić do ekstremalnego przeuczenia.
+-   **Zbiór testowy otwieramy TYLKO RAZ** - wielokrotna ewaluacja to
+    cichy wyciek danych.
+
+------------------------------------------------------------------------
+
+# Zadania do samodzielnej realizacji
+
+Poniższe zadania są kontynuacją analizy przeprowadzonej w głównej części
+dokumentu. Wszystkie obiekty (`train_data`, `test_data`, `data_split`,
+`cv_folds`, `base_recipe`, `tree_recipe`, `reg_metrics`, `all_cv`,
+`xgb_fit`, `shap_obj`) są dostępne w środowisku.
+
+## Zadanie 1: Pełny pipeline tidymodels dla modelu KNN - zadanie główne
+
+## Zadanie 2: Elastic Net - zadanie bonusowe / dla szybszych osób
+
+> **⚠️ Uwaga metodyczna:** W zadaniach ćwiczeniowych używamy
+> `last_fit()`, aby przećwiczyć pełny schemat tidymodels. W praktycznym
+> projekcie zbiór testowy powinien być otwarty tylko raz, po ostatecznym
+> wyborze modelu. Wyniki z zadań traktujemy jako ćwiczenie składni, nie
+> jako formalny proces selekcji.
+
+------------------------------------------------------------------------
+
+## Zadanie 1: Pełny pipeline tidymodels dla modelu KNN ⭐ {.tabset}
+
+W tym zadaniu zbudujemy od początku kompletny pipeline dla modelu KNN
+(*k-nearest neighbors*) w regresji. Model KNN przewiduje wartość
+zmiennej objaśnianej na podstawie najbardziej podobnych obserwacji ze
+zbioru uczącego.
+
+Celem zadania jest przećwiczenie całej ścieżki tidymodels: specyfikacja
+recipe → definicja modelu → workflow → siatka hiperparametrów → tuning
+CV → wybór najlepszego modelu → ewaluacja na zbiorze testowym.
+
+> **📖 Podpowiedź — model KNN**
+>
+> KNN (*k-nearest neighbors*) przewiduje wartość zmiennej objaśnianej
+> jako (ważoną) średnią z $k$ najbliższych obserwacji w przestrzeni
+> predyktorów. Kluczowe hiperparametry:
+>
+> | tidymodels | Znaczenie |
+> |-------------------------|-----------------------------------------------|
+> | `neighbors` | liczba sąsiadów $k$ |
+> | `weight_func` | sposób ważenia sąsiadów (rectangular, triangular, epanechnikov...) |
+> | `dist_power` | parametr odległości Minkowskiego (1 = Manhattan, 2 = euklidesowa) |
+>
+> Ponieważ KNN opiera się na **odległościach** między obserwacjami,
+> standaryzacja zmiennych numerycznych jest tutaj szczególnie ważna —
+> bez niej zmienna o dużym zakresie (np. `masa`) zdominuje obliczanie
+> odległości.
+>
+> W tidymodels: `nearest_neighbor()` + `set_engine("kknn")`. Potrzebny
+> pakiet: `kknn`.
+
+### Krok 1: Recipe
+
+KNN wymaga standaryzacji, więc używamy recipe analogicznego do
+`base_recipe`. Winsoryzację stosujemy tylko do typowych zmiennych
+ilościowych ciągłych: `pojemnosc`, `moc`, `masa` i `przysp`. Nie
+winsoryzujemy tutaj zmiennej `rok`, bo ma ona charakter uporządkowanego
+wskaźnika czasu, ani zmiennej `cylindry`, która jest zmienną dyskretną o
+niewielu wartościach.
+
+```{r zad1-knn-recipe}
+#UZUPEŁNIJ!
+### Krok 1: Recipe
+
+knn_recipe <- recipe(zuzycie ~ ., data = train_data) %>%
+  # TODO: dodaj winsoryzację zmiennych: pojemnosc, moc, masa, przysp
+  step_winsorize_iqr(pojemnosc, moc, masa, przysp, multiplier = 1.5) %>%
+  
+  # TODO: zakoduj zmienne jakościowe jako zmienne zero-jedynkowe
+  step_dummy(all_nominal_predictors(), one_hot = FALSE) %>%
+  
+  # TODO: usuń predyktory o zerowej wariancji
+  step_zv(all_predictors()) %>%
+  
+  # TODO: wystandaryzuj predyktory numeryczne
+  step_normalize(all_numeric_predictors())
+
+knn_recipe
+```
+
+### Krok 2: Specyfikacja modelu
+
+```{r zad1-knn-spec}
+#UZUPEŁNIJ!
+knn_spec <- nearest_neighbor(
+  neighbors   = tune(),   # TODO: ustaw strojenie liczby sąsiadów
+  weight_func = tune(),   # TODO: ustaw strojenie funkcji wag
+  dist_power  = tune()    # TODO: ustaw strojenie potęgi odległości
+) %>%
+  set_engine("kknn") %>%   # TODO: silnik dla KNN
+  set_mode("regression")         # TODO: tryb regresji
+```
+
+### Krok 3: Workflow
+
+```{r zad1-knn-wf}
+#UZUPEŁNIJ!
+
+knn_wf <- workflow() %>%
+  add_recipe(knn_recipe) %>%   # TODO: dodaj recipe dla KNN
+  add_model(knn_spec)        # TODO: dodaj specyfikację modelu KNN
+
+knn_wf
+```
+
+### Krok 4: Siatka hiperparametrów
+
+W tym kroku tworzymy siatkę hiperparametrów dla KNN. Model będzie
+sprawdzał różne liczby sąsiadów, różne sposoby ważenia sąsiadów oraz
+różne definicje odległości.
+
+Użyjemy zakresu `neighbors` od 3 do 25, trzech funkcji wag:
+`"rectangular"`, `"triangular"` i `"epanechnikov"` oraz dwóch wartości
+`dist_power`: 1 i 2. Wartość `dist_power = 1` odpowiada odległości
+Manhattan, a `dist_power = 2` odległości euklidesowej.
+
+```{r zad1-knn-grid}
+#UZUPEŁNIJ!
+knn_grid <- grid_regular(
+  neighbors(range = c(3, 25)),   # TODO: zakres liczby sąsiadów, np. 3–25
+  
+  weight_func(values = c(
+    "rectangular",   # TODO: prosty wariant wag
+    "triangular",   # TODO: większa waga dla bliższych sąsiadów
+    "epanechnikov"    # TODO: kolejny wariant wag malejących z odległością
+  )),
+  
+  dist_power(range = c(1, 2)),  # TODO: 1 = Manhattan, 2 = euklidesowa
+  
+  levels = c(
+    neighbors = 8,
+    weight_func = 3,
+    dist_power = 2
+  )
+)
+
+cat("Kombinacji do przeszukania:", nrow(knn_grid), "\n")
+```
+
+### Krok 5: Tuning przez walidację krzyżową
+
+W tym kroku uruchamiamy strojenie modelu KNN. Funkcja `tune_grid()`
+sprawdzi wszystkie kombinacje hiperparametrów z siatki `knn_grid` i
+oceni je w walidacji krzyżowej.
+
+Argument `control_grid(save_pred = TRUE)` zapisuje predykcje z
+resamplingu. Dzięki temu później można nie tylko porównać metryki, ale
+też dokładniej analizować zachowanie modelu.
+
+```{r zad1-knn-tune}
+#UZUPEŁNIJ!
+knn_tune <- tune_grid(
+  knn_wf,                  # TODO: workflow KNN,
+  resamples = cv_folds,      # TODO: obiekt z walidacją krzyżową,
+  grid      = knn_grid,      # TODO: siatka hiperparametrów, 
+  metrics   = reg_metrics,      # TODO: zestaw metryk regresyjnych,
+  control   = control_grid(save_pred = TRUE)
+)
+
+collect_metrics(knn_tune) %>%
+  filter(.metric == "rmse") %>%
+  arrange(mean) %>%
+  head(5) %>%
+  kable(
+    caption = "Top 5 konfiguracji KNN wg RMSE",
+    digits = 4
+  )
+```
+
+```{r zad1-knn-tune-plot, fig.height = 5}
+autoplot(knn_tune) +
+  labs(title = "KNN: metryki w funkcji hiperparametrów") +
+  theme_minimal()
+```
+
+### Krok 6: Wybór najlepszego modelu i finalizacja
+
+Po zakończeniu strojenia wybieramy najlepszą konfigurację KNN według
+RMSE. Następnie `finalize_workflow()` podstawia wybrane hiperparametry
+do workflow, dzięki czemu otrzymujemy gotowy model do końcowego uczenia
+i oceny na zbiorze testowym.
+
+```{r zad1-knn-best}
+#UZUPEŁNIJ!
+knn_best <- select_best(
+  knn_tune,              # TODO: wyniki strojenia, 
+  metric = "rmse"   # TODO: metryka wyboru,
+)
+
+knn_best
+
+knn_final_wf <- finalize_workflow(
+  knn_wf,      # TODO: workflow KNN, 
+  knn_best       # TODO: najlepsze hiperparametry, 
+)
+```
+
+### Podgląd wyniku: najlepsza konfiguracja KNN
+
+Po zakończeniu strojenia wybieramy taką kombinację hiperparametrów,
+która uzyskała najlepszy wynik w walidacji krzyżowej. W tym przykładzie
+kryterium wyboru jest najniższa wartość RMSE.
+
+Ta tabela pokazuje, do jakiej konfiguracji powinien doprowadzić etap
+tuningu modelu KNN.
+
+```{r zad1-knn-best-table}
+knn_best %>%
+  kable(
+    caption = "Najlepsza konfiguracja hiperparametrów KNN według RMSE",
+    digits = 4
+  )
+```
+
+### Krok 7: Ewaluacja na zbiorze testowym
+
+W tym kroku oceniamy finalny model KNN na zbiorze testowym. Zbiór
+testowy był odłożony na początku analizy, więc traktujemy go jako
+końcową, bardziej niezależną ocenę jakości modelu.
+
+```{r zad1-knn-test}
+#UZUPEŁNIJ!
+
+knn_last_fit <- last_fit(
+  knn_final_wf,              # TODO: końcowy workflow KNN,
+  split   = data_split,    # TODO: podział train/test,
+  metrics = reg_metrics     # TODO: zestaw metryk regresyjnych,
+)
+
+collect_metrics(knn_last_fit) %>%
+  kable(
+    caption = "KNN — metryki na zbiorze testowym",
+    digits = 4
+  )
+```
+
+### Podgląd wyniku: metryki testowe KNN w czytelnej tabeli
+
+Wynik KNN warto obejrzeć nie tylko jako surowy output z
+`collect_metrics()`, ale też jako uporządkowaną tabelę. Dzięki temu w
+HTML-u od razu widać, jaki błąd uzyskał model na zbiorze testowym.
+
+```{r zad1-knn-test-summary}
+knn_test_summary <- collect_metrics(knn_last_fit) %>%
+  mutate(
+    model = "KNN",
+    interpretacja = case_when(
+      .metric == "rmse" ~ "typowy większy błąd predykcji",
+      .metric == "mae"  ~ "przeciętny błąd bezwzględny",
+      .metric == "rsq"  ~ "udział wyjaśnionej zmienności",
+      TRUE ~ ""
+    )
+  ) %>%
+  dplyr::select(model, .metric, .estimate, interpretacja)
+
+knn_test_summary %>%
+  kable(
+    caption = "KNN — podsumowanie metryk na zbiorze testowym",
+    digits = 4
+  )
+```
+
+```{r zad1-knn-obs-pred, fig.height = 4}
+knn_test_pred <- collect_predictions(knn_last_fit)
+
+ggplot(knn_test_pred, aes(x = zuzycie, y = .pred)) +
+  geom_point(alpha = 0.6, colour = "#4C78A8") +
+  geom_abline(colour = "red", linetype = "dashed") +
+  labs(title = "KNN: obserwowane vs przewidywane (TEST)",
+       x = "Obserwowane (l/100 km)", y = "Przewidywane") +
+  theme_minimal()
+```
+
+> **🔍 Pytanie do studenta:** Jak KNN wypada w porównaniu z modelami z
+> głównej analizy? Dlaczego standaryzacja jest kluczowa dla KNN, a
+> nieistotna dla drzew CART i XGBoost?
+
+# KNN mimo większego udziału wyjaśnionej zmienności w
+
+# jest gorszy od innych modeli, które mają niższy udział
+
+# 
+
+# pod względem błędu w zależności od jego rodzaju:
+
+# dla rmse jest na drugim miejscu
+
+# dla mape/mae jest to przedostatnie miejsce
+
+# 
+
+# standaryzacja jest nieistotna dla CART i xgboost,
+
+# ponieważ oba modele są oparte o struktury drzewiaste,
+
+# które to są odporne na nieustandaryzowane dane
+
+# w przypadku nieustandaryzowanych danych zmieniają się
+
+## \# jedynie wartości progowe, jednak nie ma to wpływu na zachowanie modeli
+
+## Zadanie 2: Elastic Net — modyfikacja istniejącego modelu ⭐
+
+**Cel:** Zmodyfikować model LASSO tak, aby strojona była nie tylko
+`penalty`, ale też `mixture` (proporcja między karą L1 a L2). Zadanie
+sprawdza, czy student rozumie, jak zmienić specyfikację modelu i
+rozszerzyć siatkę hiperparametrów.
+
+> **📖 Podpowiedź — Elastic Net**
+>
+> Elastic Net to uogólnienie LASSO i Ridge:
+>
+> -   `mixture = 1` → czyste LASSO (kara L1, zeruje współczynniki)
+> -   `mixture = 0` → czyste Ridge (kara L2, ściska, ale nie zeruje)
+> -   `0 < mixture < 1` → Elastic Net (kombinacja obu kar)
+>
+> Strojenie `mixture` pozwala modelowi samemu znaleźć optymalną
+> proporcję między selekcją zmiennych (L1) a stabilizacją współczynników
+> (L2).
+
+### Krok 1: Specyfikacja Elastic Net
+
+W Elastic Net modyfikujemy wcześniejszy model LASSO. Nadal używamy
+silnika `glmnet`, ale oprócz parametru `penalty` stroimy także
+`mixture`, czyli proporcję między karą L1 i L2.
+
+W tym zadaniu nie budujemy całego pipeline’u od zera. Korzystamy z
+wcześniejszego obiektu `base_recipe`, czyli bazowego przepisu
+przygotowania danych używanego już przy modelach liniowych. Nowym
+elementem jest `enet_spec`, czyli specyfikacja modelu Elastic Net, którą
+zdefiniujemy w tym chunku i od razu dodamy do workflow.
+
+```{r zad2-enet-spec}
+enet_spec <- linear_reg(
+  penalty = tune(),   # TODO: 
+  mixture = tune()    # TODO:
+) %>%
+  set_engine("glmnet") %>%   # TODO: 
+  set_mode("regression")         # TODO:
+
+enet_wf <- workflow() %>%
+  add_recipe(base_recipe) %>%     # TODO: 
+  add_model(enet_spec)          # TODO: 
+```
+
+### Krok 2: Siatka 2D i tuning
+
+W tym kroku tworzymy dwuwymiarową siatkę hiperparametrów dla Elastic
+Net. Stroimy jednocześnie `penalty`, czyli siłę regularyzacji, oraz
+`mixture`, czyli proporcję między Ridge (`mixture = 0`) a LASSO
+(`mixture = 1`).
+
+Warto pamiętać, że w `tidymodels` zakres `penalty(range = c(-4, 0))`
+oznacza wartości od `10^-4` do `10^0`, czyli od bardzo słabej do
+silniejszej kary.
+
+```{r zad2-enet-grid}
+
+enet_grid <- grid_regular(
+  penalty(range = c(-4, 0)),   # TODO: 
+  mixture(range = c(0, 1)),   # TODO: 
+  
+  levels = c(
+    penalty = 20, mixture = 5) # łącznie 20x5 kombinacji
+)
+
+cat("Kombinacji do przeszukania:", nrow(enet_grid), "\n")
+```
+
+W tym kroku uruchamiamy strojenie Elastic Net na przygotowanej siatce
+hiperparametrów. Model sprawdzi różne kombinacje `penalty` i `mixture`,
+a wyniki walidacji krzyżowej posłużą później do wyboru najlepszej
+konfiguracji.
+
+```{r zad2-enet-tune}
+enet_tune <- tune_grid(
+  enet_wf,
+  resamples = cv_folds,
+  grid      = enet_grid,
+  metrics   = reg_metrics,
+  control   = control_grid(save_pred = TRUE)
+)
+```
+
+```{r zad2-enet-tune-plot, fig.height = 5}
+autoplot(enet_tune) +
+  labs(title = "Elastic Net: metryki w funkcji penalty i mixture") +
+  theme_minimal()
+```
+
+### Krok 3: Wybór najlepszego modelu
+
+W tym kroku wybieramy najlepszą konfigurację Elastic Net. Podobnie jak
+przy LASSO stosujemy regułę 1-SE: nie wybieramy automatycznie modelu z
+absolutnie najniższym RMSE, tylko model prostszy, którego wynik mieści
+się w granicy jednego błędu standardowego od najlepszego wyniku.
+
+W praktyce oznacza to preferowanie silniejszej regularyzacji, dlatego w
+`select_by_one_std_err()` porządkujemy kandydatów malejąco po `penalty`.
+
+```{r zad2-enet-best}
+enet_best <- select_by_one_std_err(
+  enet_tune,              # TODO: wyniki strojenia
+  metric = "rmse",  # TODO: metryka wyboru
+  desc(penalty)         # TODO: preferuj większą penalty w ramach reguły 1-SE
+)
+
+enet_best
+
+enet_final_wf <- finalize_workflow(
+  enet_wf,      # TODO: workflow Elastic Net,
+  enet_best       # TODO: najlepsza konfiguracja
+)
+
+enet_fit <- fit(
+  enet_final_wf,             # TODO: finalny workflow
+  data = train_data      # TODO: dane treningowe
+)
+```
+
+### Podgląd wyniku: najlepsza konfiguracja Elastic Net
+
+Po strojeniu wybieramy konfigurację modelu zgodnie z regułą 1-SE. W tym
+zadaniu interesuje nas nie tylko siła kary `penalty`, ale też parametr
+`mixture`, który mówi, czy model zachowuje się bardziej jak Ridge, LASSO
+czy klasyczny Elastic Net.
+
+```{r zad2-enet-best-table}
+enet_best %>%
+  mutate(
+    typ_modelu = case_when(
+      mixture == 1 ~ "LASSO",
+      mixture == 0 ~ "Ridge",
+      TRUE ~ "Elastic Net"
+    )
+  ) %>%
+  kable(
+    caption = "Najlepsza konfiguracja Elastic Net według reguły 1-SE",
+    digits = 4
+  )
+```
+
+### Krok 4: Współczynniki i porównanie z LASSO
+
+```{r zad2-enet-coefs}
+enet_coefs <- enet_fit %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(estimate)))
+
+kable(enet_coefs,
+      caption = "Współczynniki Elastic Net",
+      digits = 4)
+```
+
+```{r zad2-enet-vs-lasso}
+enet_best_cv <- enet_tune %>%
+  collect_metrics() %>%
+  filter(.config == enet_best$.config) %>%
+  mutate(model = "Elastic Net")
+
+bind_rows(
+  all_cv %>% filter(model == "LASSO"),
+  enet_best_cv %>% dplyr::select(model, .metric, mean, std_err)
+) %>%
+  pivot_wider(names_from = .metric,
+              values_from = c(mean, std_err)) %>%
+  kable(caption = "LASSO vs Elastic Net — metryki CV", digits = 4)
+```
+
+> **🔍 Pytanie do studenta:** Jaka wartość `mixture` została wybrana?
+> Czy Elastic Net wyzerował inne zmienne niż LASSO? Jeśli `mixture` jest
+> bliskie 1, co to mówi o przydatności kary L2 w tym zbiorze?
+
+# elastic net sprowadził się do ridge - mixture = 0,
+
+# 
+
+# Elastic net nie wyzerował do końca żadnej zmiennej,
+
+# chociaż niektóre współczynniki mają bardzo mały udział
+
+# Elastic net zmniejszył udział podobnych predyktorów,
+
+# które wyzerowało lasso
+
+# 
+
+# 
+
+# gdy `mixture` jest bliskie 1, to znaczy, że kara L2
+
+# jest nieskuteczna,
+
+------------------------------------------------------------------------
+
+*Koniec sekcji z zadaniami. Powodzenia!* \|term \| estimate\| penalty\|
+\|:------------------\|--------:\|-------:\| \|masa \| 2.1152\| 0.2043\|
+\|rok \| -0.9880\| 0.2043\| \|moc \| 0.8618\| 0.2043\| \|cylindry \|
+0.0775\| 0.2043\| \|pojemnosc \| 0.0000\| 0.2043\| \|przysp \| 0.0000\|
+0.2043\| \|pochodzenie_Azja \| 0.0000\| 0.2043\| \|pochodzenie_Europa \|
+0.0000\| 0.2043\|

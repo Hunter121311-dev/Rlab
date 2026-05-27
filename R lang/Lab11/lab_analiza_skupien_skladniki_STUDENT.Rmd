@@ -1,0 +1,1722 @@
+---
+title: "Segmentacja produktów spożywczych — analiza skupień z PCA"
+author: "Materiały z przedmiotu **Język R, kierunek Data Science**"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    fig_width: 7
+    fig_height: 4.5
+  word_document:
+    toc: true
+    toc_depth: '3'
+subtitle: "Od surowych danych do profili składników — PCA + k-średnie w R"
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  dpi       = 110
+)
+options(scipen = 999, digits = 4)
+```
+
+# Wprowadzenie
+
+## O czym jest ten dokument
+
+Ten dokument prowadzi przez **kompletną ścieżkę analizy skupień** - od
+wczytania surowego pliku Excel z danymi o składnikach odżywczych
+produktów spożywczych, przez czyszczenie danych, redukcję wymiarowości
+metodą PCA, po segmentację produktów algorytmem k-średnich i
+interpretację uzyskanych profili.
+
+Dokument łączy trzy warstwy:
+
+- **warstwa analityczna** - każdy krok jest wykonany i zinterpretowany w
+  kontekście problemu badawczego,
+- **warstwa programistyczna** - kod w R ilustruje dobre praktyki:
+  pipeline'y z `dplyr`, funkcje wielokrotnego użytku, czytelne
+  nazewnictwo,
+- **warstwa dydaktyczna** - bloki oznaczone **📖 Przypomnienie
+  teoretyczne** wyjaśniają statystyczne „dlaczego" za każdą decyzją.
+
+## Czego dotyczy analiza
+
+Pytanie badawcze: **czy produkty spożywcze można pogrupować w spójne
+segmenty na podstawie ich profilu składników odżywczych?** Jeśli tak -
+jakie cechy odżywcze definiują poszczególne segmenty i jak odnoszą się
+one do znanych kategorii żywności (nabiał, mięso, owoce itp.)?
+
+Jest to **analiza nienadzorowana** - algorytm nie zna etykiet kategorii
+(kolumna `Group`). Dopiero po segmentacji porównamy wynik z prawdziwymi
+grupami, żeby ocenić sensowność odkrytej struktury.
+
+## Ścieżka analizy - mapa dokumentu
+
+1.  **Wczytanie i przegląd danych** → zrozumienie struktury i skali
+2.  **Diagnostyka jakości** → identyfikacja braków i wartości
+    odstających
+3.  **Czyszczenie danych** → imputacja braków, winsoryzacja outlierów
+4.  **Analiza korelacji** → wykrycie zmiennych nadmiarowych
+5.  **Standaryzacja** → wyrównanie skal przed PCA i analizą skupień
+6.  **PCA - redukcja wymiarowości** → kompresja informacji z zachowaniem
+    struktury
+7.  **Analiza skupień (k-średnich)** → segmentacja na składowych
+    głównych
+8.  **Dobór liczby skupień** → metoda łokcia + sylwetka
+9.  **Profilowanie segmentów** → interpretacja merytoryczna
+10. **Walidacja** → porównanie z rzeczywistymi kategoriami żywności
+
+## Konwencje użyte w dokumencie
+
+- **📖 Przypomnienie teoretyczne** - zwięzłe wprowadzenie statystyczne
+  przed krokiem analitycznym.
+- **⚠️ Pułapka** - typowy błąd, którego warto unikać.
+- Sekcje oznaczone **(\*)** są opcjonalne - dotyczą technik
+  zaawansowanych.
+
+------------------------------------------------------------------------
+
+# Przygotowanie środowiska
+
+## Wymagane pakiety
+
+```{r install-packages, eval = FALSE}
+# Uruchom tylko przy pierwszym użyciu
+install.packages(c(
+  "tidyverse",      # manipulacja i wizualizacja danych
+  "readxl",         # wczytywanie plików Excel
+  "janitor",        # porządkowanie nazw kolumn
+  "skimr",          # szybki przegląd statystyczny
+  "naniar",         # analiza i wizualizacja braków danych
+  "VIM",            # imputacja metodą kNN
+  "factoextra",     # wizualizacja PCA i klasteryzacji
+  "FactoMineR",     # PCA i analiza czynnikowa
+  "NbClust",        # automatyczny dobór liczby skupień
+  "cluster",        # silhouette i inne metryki
+  "corrplot",       # wizualizacja macierzy korelacji
+  "patchwork",      # łączenie wykresów ggplot
+  "knitr",          # ładne tabele w raportach
+  "kableExtra",     # rozszerzone formatowanie tabel
+  "psych",          # test KMO i sferyczności Bartletta
+  "mclust",         # Adjusted Rand Index
+  "dbscan",         # DBSCAN (zadania)
+  "ggrepel"         # czytelne etykiety na wykresach ggplot bez nachodzenia na siebie
+))
+```
+
+## Wczytanie bibliotek
+
+Dobra praktyka: ładuj wszystkie pakiety na początku dokumentu, z krótkim
+komentarzem do czego służą. Czytelnik widzi od razu, czego potrzebuje.
+
+```{r load-libraries}
+library(tidyverse)    # dplyr + ggplot2 + tidyr + purrr
+library(readxl)       # read_excel()
+library(janitor)      # clean_names()
+library(skimr)        # skim()
+library(naniar)       # gg_miss_var(), vis_miss()
+library(VIM)          # kNN()
+library(factoextra)   # fviz_pca_*(), fviz_cluster()
+library(FactoMineR)   # PCA()
+library(NbClust)      # NbClust()
+library(cluster)      # silhouette()
+library(corrplot)     # corrplot()
+library(patchwork)    # operator + do łączenia ggplotów
+library(knitr)        # kable()
+library(psych)        # KMO(), cortest.bartlett()
+library(mclust)       # adjustedRandIndex()
+```
+
+> **⚠️ Pułapka:** Pakiet `VIM` maskuje funkcję `sample()` z base R.
+> Jeśli po załadowaniu VIM pojawi się nieoczekiwany błąd w losowaniu,
+> wywołaj jawnie `base::sample()`.
+
+------------------------------------------------------------------------
+
+# Wczytanie i pierwszy przegląd danych
+
+## Import z pliku Excel
+
+Plik **`skladniki.xlsx`** zawiera dane o wartościach odżywczych 69
+produktów spożywczych. Nazwy produktów są w pierwszej kolumnie
+(food_product).
+
+```{r load-data}
+df_raw <- read_excel("skladniki.xlsx")
+```
+
+## Porządkowanie nazw kolumn
+
+Oryginalne nazwy zawierają polskie znaki, spacje i nawiasy — to utrudnia
+pracę w R. Przekształcamy je na **snake_case**.
+
+```{r clean-names}
+df <- df_raw %>%
+  clean_names() %>%
+  mutate(case_id = row_number(), .before = 1)
+
+names(df)
+```
+
+## Szybki przegląd
+
+```{r first-glance}
+dim(df)
+```
+
+```{r glimpse-data}
+glimpse(df)
+```
+
+```{r preview-data}
+head(df, 10)
+```
+
+Funkcja `skim(df)` tworzy szybkie podsumowanie struktury zbioru danych,
+pokazując m.in. typy zmiennych, liczbę braków danych oraz podstawowe
+statystyki opisowe.\
+Jest to wygodny pierwszy krok eksploracyjnej analizy danych, ponieważ
+pozwala szybko wychwycić potencjalne problemy, takie jak braki,
+nietypowe typy kolumn lub skrajne wartości.
+
+```{r skim}
+skim(df)
+```
+
+------------------------------------------------------------------------
+
+# Skale pomiarowe - fundament dalszej analizy
+
+> **📖 Przypomnienie teoretyczne - skale pomiarowe Stevensa**
+>
+> | Skala        | Pytanie                      | Przykład                       |
+> |------------------|--------------------------|----------------------------|
+> | Nominalna    | czy dwa obiekty się różnią   | kategoria żywności (Group)     |
+> | Porządkowa   | który obiekt jest „lepszy"   | ocena jakości (brak w zbiorze) |
+> | Przedziałowa | o ile obiekt jest większy    | temperatura w °C               |
+> | Ilorazowa    | ile razy obiekt jest większy | energia, białko, tłuszcz       |
+>
+> Wszystkie zmienne odżywcze (kcal, gramy, miligramy, mikrogramy) są na
+> skali **ilorazowej** - mają naturalne zero i sensowny jest iloraz.
+> Zmienna `group` jest **nominalna**.
+
+## Klasyfikacja zmiennych w naszym zbiorze
+
+Dzielimy zmienne na trzy grupy: identyfikatory (nazwa produktu, numer
+wiersza), zmienną grupującą (`group` - typ produktu, np. mięso, nabiał)
+oraz zmienne ilościowe (zawartości składników odżywczych). Tylko zmienne
+ilościowe trafią do PCA i klastrowania - identyfikatory służą wyłącznie
+do opisywania wyników, a zmienna `group` posłuży później do walidacji
+skupień za pomocą ARI.
+
+```{r variable-groups}
+id_vars        <- c("case_id", "food_product", "id")
+categorical_vars <- "group"
+
+quantitative_vars <- setdiff(names(df), c(id_vars, categorical_vars))
+
+cat("Zmienne ilościowe (predyktory):\n")
+cat(paste(quantitative_vars, collapse = ", "), "\n\n")
+cat("Zmienna jakościowa:\n")
+cat(categorical_vars, "\n")
+```
+
+## Ustalenie typów w R
+
+Konwertujemy zmienną group z typu tekstowego na factor. R traktuje
+factor jako zmienną jakościową z określonym zbiorem wariantów - dzięki
+temu funkcje wizualizacyjne i analityczne (np. ggplot,
+adjustedRandIndex) poprawnie rozpoznają ją jako zmienną grupująca, a nie
+jako tekst.
+
+```{r coerce-types}
+df <- df %>%
+  mutate(group = factor(group))
+```
+
+------------------------------------------------------------------------
+
+# Diagnostyka jakości danych
+
+## Braki w poszczególnych zmiennych
+
+```{r variable-quality}
+make_variable_quality_summary <- function(data) {
+  tibble(
+    variable    = names(data),
+    class       = map_chr(data, ~ paste(class(.x), collapse = ", ")),
+    n_missing   = map_int(data, ~ sum(is.na(.x))),
+    pct_missing = map_dbl(data, ~ mean(is.na(.x)) * 100),
+    n_unique    = map_int(data, ~ n_distinct(.x, na.rm = TRUE))
+  ) %>%
+    mutate(pct_missing = round(pct_missing, 2)) %>%
+    arrange(desc(pct_missing))
+}
+
+variable_summary <- make_variable_quality_summary(df)
+variable_summary
+```
+
+**Co z tego wynika?** Największy odsetek braków ma `witamina_d_ug` (ok.
+32 %) oraz `witamina_b2_mg` i `blonnik_g` (ok. 20 %). Dla zmiennych o
+niskim odsetku braków (poniżej 5 %) wystarczy prosta imputacja medianą;
+powyżej 5 % sięgniemy po **kNN**.
+
+## Braki w poszczególnych przypadkach
+
+```{r case-quality}
+make_case_missing_report <- function(data, id_col = 1, top_n = NULL) {
+  id_name    <- names(data)[id_col]
+  data_no_id <- data %>% dplyr::select(all_of(quantitative_vars))
+
+  report <- tibble(
+    !!id_name   := data[[id_col]],
+    food_product = data[["food_product"]],
+    n_missing    = rowSums(is.na(data_no_id)),
+    pct_missing  = round(rowMeans(is.na(data_no_id)) * 100, 2)
+  ) %>%
+    arrange(desc(pct_missing))
+
+  if (!is.null(top_n)) report <- slice_head(report, n = top_n)
+  report
+}
+
+make_case_missing_report(df, top_n = 15)
+```
+
+## Wizualny wzorzec braków
+
+```{r missing-visuals, fig.height = 6, fig.width = 9}
+gg_miss_var(df %>% dplyr::select(all_of(quantitative_vars)),
+            show_pct = TRUE) +
+  labs(title = "Odsetek braków w zmiennych odżywczych") +
+  theme(axis.text.y = element_text(size = 9))
+
+vis_miss(df %>% dplyr::select(all_of(quantitative_vars)),
+         sort_miss = TRUE,
+         cluster   = FALSE) +
+  labs(title = "Mapa braków (czarne = NA)") +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, size = 8))
+```
+
+> **📖 Przypomnienie teoretyczne - mechanizmy braków (Rubin, 1976)**
+>
+> - **MCAR** (*Missing Completely At Random*) - braki losowe, niezależne
+>   od czegokolwiek.
+> - **MAR** (*Missing At Random*) - braki zależne od obserwowanych
+>   zmiennych (np. witamina D częściej brakuje w owocach, bo nie jest
+>   typowo oznaczana).
+> - **MNAR** (*Missing Not At Random*) - braki zależne od samej
+>   wartości.
+>
+> W danych żywieniowych braki często wynikają z **niepublikowania**
+> wartości poniżej progu wykrywalności lub z pominięcia analizy
+> laboratoryjnej - mechanizm jest prawdopodobnie bliski MAR.
+
+------------------------------------------------------------------------
+
+# Czyszczenie danych
+
+## Usunięcie przypadków z dużym odsetkiem braków
+
+Produkty z brakami w ponad 40 % zmiennych odżywczych mają za mało
+informacji, by sensownie imputować brakujące wartości.
+
+```{r drop-bad-rows}
+pct_miss_per_row <- rowMeans(is.na(df %>% dplyr::select(all_of(quantitative_vars))))
+threshold <- 0.40
+
+removed_products <- df %>%
+  filter(pct_miss_per_row > threshold) %>%
+  dplyr::select(case_id, food_product)
+
+df <- df %>% filter(pct_miss_per_row <= threshold)
+
+cat("Usunięto", nrow(removed_products), "produktów:\n")
+if (nrow(removed_products) > 0) print(removed_products)
+cat("\nPozostało:", nrow(df), "produktów\n")
+```
+
+## Uzupełnenie braków danych
+
+### Strategia dwuetapowa
+
+| Odsetek braków | Metoda                    | Uzasadnienie                     |
+|------------------|------------------------|------------------------------|
+| do \~5 %       | mediana                   | wpływ na rozkład minimalny       |
+| 5–35 %         | **kNN**                   | uwzględnia podobieństwo obiektów |
+| powyżej 40 %   | rozważ usunięcie zmiennej | zbyt mało informacji             |
+
+Obliczamy odsetek braków danych w każdej zmiennej ilościowej. Na
+podstawie wyniku zmienne dzielimy na dwie grupy: te z niewielkim
+odsetkiem braków (poniżej 5%) oraz te z wyższym odsetkiem (5% i więcej).
+Podział decyduje o strategii imputacji - drobne braki uzupełnimy medianą
+(szybko, bez ryzyka), natomiast zmienne z większą liczbą braków wymagają
+bardziej zaawansowanej metody (kNN), która uwzględnia strukturę
+zależności między zmiennymi.
+
+```{r identify-imputation-groups}
+miss_pct <- df %>%
+  dplyr::select(all_of(quantitative_vars)) %>%
+  summarise(across(everything(), ~ mean(is.na(.x)) * 100)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "pct") %>%
+  arrange(desc(pct))
+
+vars_miss_low  <- miss_pct %>% filter(pct > 0 & pct < 5)  %>% pull(variable)
+vars_miss_high <- miss_pct %>% filter(pct >= 5) %>% pull(variable)
+
+cat("Zmienne z brakami < 5%:", paste(vars_miss_low, collapse = ", "), "\n")
+cat("Zmienne z brakami >= 5%:", paste(vars_miss_high, collapse = ", "), "\n")
+```
+
+### Imputacja medianą (niski odsetek braków)
+
+```{r impute-median}
+if (length(vars_miss_low) > 0) {
+  for (v in vars_miss_low) {
+    med_val <- median(df[[v]], na.rm = TRUE)
+    n_imp   <- sum(is.na(df[[v]]))
+    df[[v]][is.na(df[[v]])] <- med_val
+    cat(v, "— uzupełniono", n_imp, "braków medianą =", round(med_val, 2), "\n")
+  }
+}
+```
+
+### Imputacja kNN (wyższy odsetek braków)
+
+> **📖 Przypomnienie teoretyczne - imputacja kNN**
+>
+> Algorytm kNN (*k Nearest Neighbors*) dla każdego brakującego wpisu
+> szuka $k$ najbardziej podobnych (pod względem pozostałych zmiennych)
+> obserwacji i wstawia średnią ważoną ich wartości. Waga jest odwrotnie
+> proporcjonalna do odległości - bliżsi sąsiedzi mają większy wpływ.
+>
+> **Zalety**: zachowuje strukturę korelacji między zmiennymi, nie
+> „spłaszcza" rozkładu jak imputacja stałą wartością.
+
+> **Wady**: działa wolno przy dużych zbiorach, a przy wysokim odsetku
+> braków „sąsiedzi" sami mogą zawierać imputowane wartości, co propaguje
+> niepewność. Wynik zależy też od doboru k - zbyt małe k daje
+> niestabilne imputacje, zbyt duże zaciera lokalne wzorce w danych.
+
+```{r impute-knn}
+if (length(vars_miss_high) > 0) {
+  cat("Braki przed kNN:\n")
+  print(colSums(is.na(df[quantitative_vars])))
+
+  df_for_knn <- df %>% dplyr::select(all_of(quantitative_vars))
+  df_imputed <- VIM::kNN(df_for_knn, k = 5, imp_var = FALSE)
+
+  df[quantitative_vars] <- df_imputed
+
+  cat("\nBraki po kNN:\n")
+  print(colSums(is.na(df[quantitative_vars])))
+}
+```
+
+### Weryfikacja - czy braki zostały uzupełnione?
+
+```{r verify-no-missing}
+make_variable_quality_summary(df %>% dplyr::select(all_of(quantitative_vars)))
+```
+
+## Wartości odstające - winsoryzacja
+
+> **📖 Przypomnienie teoretyczne - winsoryzacja**
+>
+> Winsoryzacja to technika „przycinania" wartości ekstremalnych do
+> granic wyznaczonych przez IQR (rozstęp międzykwartylowy):
+>
+> - dolna granica: $Q_1 - 1{,}5 \times IQR$
+> - górna granica: $Q_3 + 1{,}5 \times IQR$
+>
+> Wartości poniżej dolnej granicy zastępujemy dolną granicą, powyżej
+> górnej - górną granicą. W przeciwieństwie do usunięcia outlierów **nie
+> tracimy obserwacji** - jedynie ograniczamy ich wpływ.
+
+### Boxploty przed winsoryzacją
+
+```{r boxplots-before, fig.height = 8}
+df %>%
+  dplyr::select(all_of(quantitative_vars)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot(fill = "#A8C5DA", outlier.colour = "red") +
+  coord_flip() +
+  labs(title = "Rozkłady zmiennych odżywczych — przed winsoryzacją",
+       x = NULL, y = "Wartość") +
+  theme_minimal()
+```
+
+### Funkcja winsoryzacji
+
+> **Uwaga metodyczna:** Wartości odstające w danych o składzie produktów
+> spożywczych nie zawsze oznaczają błędy. Produkt bardzo tłusty, bardzo
+> bogaty w wapń albo bardzo kaloryczny może być rzeczywistym,
+> merytorycznie ważnym przypadkiem. W tym ćwiczeniu stosujemy
+> winsoryzację jako wariant kontrolny, aby ograniczyć wpływ bardzo
+> skrajnych obserwacji na PCA i k-means. W praktycznej analizie warto
+> zawsze porównać wyniki z winsoryzacją i bez winsoryzacji.
+
+```{r winsorize-function}
+winsorize_iqr <- function(x, fold = 1.5) {
+  q <- quantile(x, probs = c(0.25, 0.75), na.rm = TRUE)
+  iqr <- q[2] - q[1]
+  lower <- q[1] - fold * iqr
+  upper <- q[2] + fold * iqr
+  pmin(pmax(x, lower), upper)
+}
+
+df <- df %>%
+  mutate(across(all_of(quantitative_vars), ~ winsorize_iqr(.x, fold = 1.5)))
+```
+
+### Boxploty po winsoryzacji
+
+```{r boxplots-after, fig.height = 8}
+df %>%
+  dplyr::select(all_of(quantitative_vars)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot(fill = "#B5D8A8", outlier.colour = "red") +
+  coord_flip() +
+  labs(title = "Rozkłady zmiennych odżywczych — po winsoryzacji",
+       x = NULL, y = "Wartość") +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
+
+# Analiza korelacji - eliminacja zmiennych nadmiarowych
+
+> **📖 Przypomnienie teoretyczne - współliniowość**
+>
+> Jeśli dwie zmienne są **silnie skorelowane** ($|r| > 0{,}8$), niosą
+> niemal tę samą informację. W analizie skupień taka redundancja
+> oznacza, że te zmienne mają **podwójną wagę** przy obliczaniu
+> odległości — co zaburza wynik.
+>
+> Rozwiązanie: usunąć jedną ze zmiennych lub użyć PCA, która naturalnie
+> łączy skorelowane zmienne w jedną składową. My zrobimy oba kroki:
+> najpierw ocenimy korelacje, potem użyjemy PCA.
+
+## Macierz korelacji
+
+Stosujemy korelację rang Spearmana zamiast Pearsona, ponieważ dane o
+składnikach odżywczych często mają rozkłady skośne i zawierają wartości
+odstające - Spearman jest na nie odporny, bo operuje na rangach, a nie
+na surowych wartościach. Dodatkowo Spearman wykrywa również zależności
+monotoniczne nieliniowe (np. gdy dwie zmienne rosną razem, ale nie
+proporcjonalnie), które Pearson mógłby przeoczyć.
+
+```{r correlation-matrix, fig.height = 7}
+cor_matrix <- cor(df %>% dplyr::select(all_of(quantitative_vars)),
+                  method = "spearman")
+
+corrplot(cor_matrix,
+         method   = "color",
+         type     = "upper",
+         order    = "hclust",
+         addCoef.col = "black",
+         number.cex  = 0.6,
+         tl.cex      = 0.7,
+         tl.col      = "black",
+         title    = "Korelacja rang Spearmana między składnikami",
+         mar      = c(0, 0, 2, 0))
+```
+
+## Identyfikacja par silnie skorelowanych
+
+```{r high-correlations}
+cor_long <- cor_matrix %>%
+  as.data.frame() %>%
+  rownames_to_column("var1") %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "r") %>%
+  filter(var1 < var2) %>%      # tylko górny trójkąt
+  arrange(desc(abs(r)))
+
+high_cor <- cor_long %>% filter(abs(r) > 0.8)
+kable(high_cor, caption = "Pary zmiennych z korelacją |r| > 0.8")
+```
+
+## Decyzja o eliminacji
+
+Jeśli `energia_kcal` jest silnie skorelowana z `tluszcz_g` (co jest
+logiczne - tłuszcz ma 9 kcal/g), to jedna z nich jest nadmiarowa.
+Usuwamy energię, bo jest **pochodną** składu makroskładnikowego.
+
+```{r remove-redundant}
+vars_to_remove <- c("energia_kcal")
+quantitative_vars <- setdiff(quantitative_vars, vars_to_remove)
+
+cat("Usunięto:", paste(vars_to_remove, collapse = ", "), "\n")
+cat("Pozostałe predyktory:", paste(quantitative_vars, collapse = ", "), "\n")
+```
+
+> **⚠️ Pułapka:** Usuwanie zmiennych na podstawie korelacji to **decyzja
+> merytoryczna**, nie automatyczna. Energia jest kalkulowana z
+> makroskładników - dlatego ją usuwamy. Gdyby dwie zmienne były
+> skorelowane „przypadkowo", decyzja byłaby mniej oczywista. PCA
+> rozwiązuje ten problem systemowo.
+
+------------------------------------------------------------------------
+
+# Standaryzacja danych
+
+> **📖 Przypomnienie teoretyczne - dlaczego standaryzujemy?**
+>
+> Zmienne w naszym zbiorze mają **drastycznie różne skale**: energia to
+> setki kcal, witamina B1 to tysięczne grama. Algorytmy oparte na
+> odległości (k-średnie, kNN, PCA na macierzy kowariancji) traktowałyby
+> zmienne o większym zakresie jako „ważniejsze".
+>
+> **Standaryzacja z-score:** $z = \frac{x - \bar{x}}{s}$ - każda zmienna
+> ma średnią 0 i odchylenie 1. To standardowy wybór przed PCA.
+>
+> **Min-Max:** $x' = \frac{x - \min}{\max - \min}$ — skaluje do
+> $[0, 1]$. Dobra przed metodą k-średnich, gdy chcemy interpretować
+> centroidy w procentach zakresu.
+
+```{r standardize}
+# Z-score dla PCA
+df_z <- df %>%
+  mutate(across(all_of(quantitative_vars), ~ scale(.x)[, 1]))
+
+# Min-Max dla k-średnich (interpretacja centroidów)
+min_max_scale <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+df_mm <- df %>%
+  mutate(across(all_of(quantitative_vars), min_max_scale))
+```
+
+### Porównanie rozkładów po standaryzacji
+
+```{r standardized-boxplots, fig.height = 5}
+p_z <- df_z %>%
+  dplyr::select(all_of(quantitative_vars)) %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_boxplot(fill = "#D4B9DA") +
+  coord_flip() +
+  labs(title = "Po standaryzacji z-score", x = NULL, y = "z") +
+  theme_minimal(base_size = 9)
+
+p_mm <- df_mm %>%
+  dplyr::select(all_of(quantitative_vars)) %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_boxplot(fill = "#FED9A6") +
+  coord_flip() +
+  labs(title = "Po skalowaniu Min-Max", x = NULL, y = "[0, 1]") +
+  theme_minimal(base_size = 9)
+
+p_z + p_mm
+```
+
+------------------------------------------------------------------------
+
+# PCA - analiza głównych składowych
+
+> **📖 Przypomnienie teoretyczne - PCA**
+>
+> Analiza głównych składowych (*Principal Component Analysis*) to metoda
+> **redukcji wymiarowości**. Przekształca zestaw skorelowanych zmiennych
+> w mniejszy zbiór **nieskorelowanych składowych głównych** (PC), które
+> zachowują maksimum wariancji oryginalnych danych.
+>
+> - **PC1** wyjaśnia największy możliwy procent wariancji.
+> - **PC2** wyjaśnia największy procent z tego, co zostało -
+>   ortogonalnie do PC1.
+> - I tak dalej.
+>
+> **Ładunki** (*loadings*) mówią, jak mocno każda oryginalna zmienna
+> wpływa na daną składową. **Wyniki** (*scores*) to współrzędne
+> obserwacji w nowej przestrzeni.
+>
+> **Dlaczego PCA przed analizą skupień?**
+>
+> 1.  Redukuje szum - słabe wymiary (z niską wariancją) mogą wprowadzać
+>     przypadkowe różnice.
+> 2.  Likwiduje współliniowość - składowe są ortogonalne.
+> 3.  Ułatwia wizualizację - klastry w 2D/3D.
+
+## Czy dane nadają się do PCA? - test KMO i test Bartletta
+
+> **📖 Przypomnienie teoretyczne - KMO i test sferyczności Bartletta**
+>
+> Przed PCA sprawdzamy dwa warunki:
+>
+> 1.  **Test sferyczności Bartletta** - weryfikuje hipotezę zerową, że
+>     macierz korelacji jest macierzą jednostkową (zmienne
+>     nieskorelowane). Jeśli $p < 0{,}05$, odrzucamy $H_0$ - dane
+>     wykazują korelacje wystarczające do PCA.
+>
+> 2.  **Kryterium KMO** (*Kaiser-Meyer-Olkin*) - mierzy, jaka część
+>     wariancji zmiennych **może wynikać** ze wspólnych czynników.
+>     Przyjmuje wartości od 0 do 1:
+>
+>     | KMO         | Interpretacja                                |
+>     |-------------|----------------------------------------------|
+>     | ≥ 0.90      | doskonałe                                    |
+>     | 0.80 – 0.89 | bardzo dobre                                 |
+>     | 0.70 – 0.79 | dobre                                        |
+>     | 0.60 – 0.69 | przeciętne                                   |
+>     | 0.50 – 0.59 | słabe, ale dopuszczalne                      |
+>     | \< 0.50     | PCA zapewne nie wyłoni sensownych składowych |
+>
+> KMO poniżej 0.50 sugeruje, że korelacje cząstkowe między zmiennymi są
+> słabe, a uzyskane składowe mogą być trudniejsze do jednoznacznej
+> interpretacji. Nie oznacza to jednak automatycznie, że PCA nie wolno
+> wykonać - jest to raczej sygnał, że wynik należy interpretować
+> ostrożnie.
+
+> **Uwaga metodyczna:** KMO i test Bartletta traktujemy jako diagnostykę
+> pomocniczą przed PCA, a nie jako bezwzględny warunek wykonania
+> analizy. Niskie KMO sugeruje, że składowe mogą być trudniejsze do
+> interpretacji, natomiast istotny test Bartletta wskazuje, że między
+> zmiennymi istnieje struktura korelacyjna, którą PCA może wykorzystać.
+
+```{r kmo-bartlett}
+library(psych)   # KMO() i cortest.bartlett()
+
+cor_mat <- cor(df %>% dplyr::select(all_of(quantitative_vars)))
+
+# Test sferyczności Bartletta
+bartlett <- cortest.bartlett(cor_mat, n = nrow(df))
+cat("Test Bartletta:\n")
+cat("  Chi-kwadrat:", round(bartlett$chisq, 2), "\n")
+cat("  df:         ", bartlett$df, "\n")
+cat("  p-wartość:  ", format.pval(bartlett$p.value, digits = 4), "\n\n")
+
+# Kryterium KMO
+kmo <- KMO(cor_mat)
+cat("KMO ogólne:", round(kmo$MSA, 3), "\n\n")
+cat("KMO dla poszczególnych zmiennych:\n")
+kmo_df <- tibble(
+  variable = names(kmo$MSAi),
+  KMO      = round(kmo$MSAi, 3)
+) %>% arrange(KMO)
+kable(kmo_df, caption = "Wartości KMO dla poszczególnych zmiennych")
+```
+
+> **⚠️ Pułapka:** Jeśli któraś zmienna ma indywidualne KMO poniżej 0.50,
+> warto rozważyć jej usunięcie i ponowne obliczenie KMO - jedna „słaba"
+> zmienna może ciągnąć w dół ogólny wskaźnik.
+
+**Interpretacja wyników KMO i testu Bartletta**
+
+Test sferyczności Bartletta dał wynik **χ² = 443** przy 66 stopniach
+swobody (**p \< 0,0001**), co oznacza, że macierz korelacji
+**zdecydowanie nie jest macierzą jednostkową** - zmienne odżywcze są
+wystarczająco skorelowane, by PCA miała sens.
+
+Ogólne KMO wynosi **0,676**, co klasyfikuje się jako wartość
+„przeciętna, ale akceptowalna" - możemy przeprowadzić PCA, choć nie
+wszystkie zmienne wnoszą równie silny wkład do wspólnej struktury.
+
+Warto zwrócić uwagę na **indywidualne wartości KMO**:
+
+- Dwie zmienne spadają **poniżej progu 0,50**: `tluszcz_g` (0,457) i
+  `wapn_mg` (0,471). Ich korelacje cząstkowe z pozostałymi zmiennymi są
+  słabe - dzielą niewiele wspólnej wariancji z resztą zbioru. Warto
+  rozważyć ich usunięcie i ponowne obliczenie KMO - możliwe, że ogólny
+  wskaźnik wzrośnie powyżej 0,70.
+- Najlepiej „pasują" do wspólnej struktury `blonnik_g` (0,861) i
+  `witamina_d_ug` (0,763), co sugeruje, że te zmienne silnie współdzielą
+  informację z innymi składnikami.
+
+> **⚠️ Pułapka:** KMO \< 0,50 dla pojedynczej zmiennej **nie oznacza
+> automatycznego usunięcia**. To sygnał do refleksji - jeśli zmienna
+> jest merytorycznie istotna (tłuszcz jest kluczowym makroskładnikiem),
+> można ją zachować, świadomie akceptując niższe KMO ogólne.
+
+## Wykonanie PCA
+
+Używamy pakietu **FactoMineR**, który automatycznie standaryzuje dane
+(argument `scale.unit = TRUE`) i dostarcza bogate wyniki diagnostyczne.
+
+```{r pca-fit}
+pca_data <- df %>% dplyr::select(all_of(quantitative_vars))
+
+pca_result <- PCA(pca_data, scale.unit = TRUE, graph = FALSE)
+```
+
+## Ile składowych zachować?
+
+### Wykres osypiska (scree plot)
+
+Wykres osypiska pokazuje, ile procent ogólnej wariancji analizowanych
+danych wyjaśnia każda kolejna składowa główna. Szukamy na nim „łokcia" —
+miejsca, gdzie spadek wariancji wyraźnie zwalnia — składowe przed
+łokciem warto zachować, reszta wnosi już niewiele informacji. Razem z
+kryterium Kaisera (wartość własna \> 1) daje to podstawę do wyboru
+liczby składowych do dalszej analizy.
+
+```{r scree-plot, fig.height = 4}
+fviz_screeplot(pca_result,
+               addlabels = TRUE,
+               ylim = c(0, 40),
+               barfill = "#4C78A8",
+               barcolor = "#4C78A8") +
+  labs(title = "Wykres osypiska - procent wyjaśnionej wariancji",
+       x = "Składowa główna",
+       y = "% wyjaśnionej wariancji") +
+  theme_minimal()
+```
+
+### Skumulowana wariancja
+
+Tabela wartości własnych uzupełnia wykres osypiska konkretnymi liczbami.
+Wartość własna (*eigenvalue*) powyżej 1 (kryterium Kaisera) oznacza, że
+składowa wyjaśnia więcej wariancji niż przeciętnie pojedyncza oryginalna
+zmienna - to minimum, żeby warto ją było zachować. Kolumna skumulowanej
+wariancji pokazuje, jaki łączny procent informacji z danych zachowujemy
+przy danej liczbie składowych.
+
+```{r cumulative-variance}
+eig <- as.data.frame(pca_result$eig)
+names(eig) <- c("eigenvalue", "variance_percent", "cumulative_variance_percent")
+kable(eig, caption = "Wartości własne i skumulowany procent wariancji",
+      digits = 2)
+```
+
+> **📖 Kryteria wyboru liczby składowych:**
+>
+> 1.  **Kryterium Kaisera** - zachowujemy składowe z wartością własną
+>     $> 1$ (wyjaśniają więcej niż jedna oryginalna zmienna).
+> 2.  **Kryterium łokcia** - szukamy „załamania" na wykresie osypiska.
+> 3.  **Kryterium skumulowanej wariancji** - zachowujemy tyle
+>     składowych, by łącznie wyjaśniały np. $\geq 70\%$ wariancji.
+>
+> W praktyce stosujemy **kombinację** tych kryteriów.
+
+```{r choose-n-components}
+# pca_result$eig to macierz: kolumny = eigenvalue, % variance, cumulative %
+eig <- as.data.frame(pca_result$eig)
+names(eig) <- c("eigenvalue", "variance_percent", "cumulative_variance_percent")
+
+n_kaiser <- sum(eig$eigenvalue > 1)
+cat("Liczba składowych wg kryterium Kaisera:", n_kaiser, "\n")
+
+n_70pct <- which(eig$cumulative_variance_percent >= 70)[1]
+cat("Liczba składowych dla >= 70% wariancji:", n_70pct, "\n")
+```
+
+## Interpretacja składowych - ładunki (loadings)
+
+Ładunki mówią, **które zmienne tworzą** każdą składową. Wysokie
+(dodatnie lub ujemne) ładunki oznaczają silny wpływ.
+
+### Wykres ładunków
+
+Wykres ładunków pokazuje, jak oryginalne zmienne „ładują" dwie pierwsze
+składowe główne. Kierunek i długość strzałki mówią, jak silnie i w jaką
+stronę zmienna wpływa na daną składową - zmienne wskazujące w tym samym
+kierunku są ze sobą skorelowane dodatnio, a zmienne po przeciwnych
+stronach korelują ujemnie. Kolor odpowiada wkładowi zmiennej do
+składowych (*contrib*) - im cieplejszy, tym zmienna silniej współtworzy
+te wymiary. Widać tu np. opozycję między białkiem/fosforem (prawo) a
+błonnikiem/węglowodanami (lewo), co sugeruje oś oddzielającą produkty
+zwierzęce od roślinnych.
+
+```{r loadings-biplot, fig.height = 5.5}
+fviz_pca_var(pca_result,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE) +
+  labs(title = "Wykres ładunków - zmienne na płaszczyźnie PC1 × PC2") +
+  theme_minimal()
+```
+
+### Tabela ładunków
+
+```{r loadings-table}
+loadings_df <- as.data.frame(pca_result$var$coord) %>%
+  rownames_to_column("variable") %>%
+  arrange(desc(abs(Dim.1)))
+
+kable(loadings_df, caption = "Ładunki zmiennych na składowych głównych",
+      digits = 3)
+```
+
+### Wkład zmiennych do składowych
+
+Wykresy wkładów (*contributions*) pokazują, ile procent wariancji danej
+składowej pochodzi od każdej zmiennej. Czerwona linia przerywana oznacza
+równomierny wkład (100% / liczba zmiennych) - zmienne powyżej tej linii
+wnoszą więcej niż „ich sprawiedliwy udział". PC1 jest budowana głównie
+przez fosfor, białko i witaminę D (składniki typowe dla produktów
+zwierzęcych), natomiast PC2 przez witaminę B1, tłuszcz i żelazo - to
+pozwala interpretować składowe jako osie rozdzielające różne profile
+żywieniowe produktów.
+
+```{r contrib-plot, fig.height = 5}
+fviz_contrib(pca_result, choice = "var", axes = 1,
+             fill = "#4C78A8", color = "#4C78A8") +
+  labs(title = "Wkład zmiennych do PC1") +
+  coord_flip() +
+  theme_minimal()
+
+fviz_contrib(pca_result, choice = "var", axes = 2,
+             fill = "#E7B800", color = "#E7B800") +
+  labs(title = "Wkład zmiennych do PC2") +
+  coord_flip() +
+  theme_minimal()
+```
+
+## Mapa obserwacji w przestrzeni PCA
+
+Wykres obserwacji w przestrzeni dwóch pierwszych składowych głównych
+pokazuje, jak produkty spożywcze rozkładają się względem siebie na
+podstawie profilu składników odżywczych. Kolorowanie według rzeczywistej
+kategorii żywności (group) pozwala ocenić, czy PCA „widzi" naturalne
+grupy produktów jeszcze PRZED analizą skupień.
+
+```{r pca-individuals, fig.height = 6}
+fviz_pca_ind(pca_result,
+             geom.ind   = "point",
+             col.ind    = df$group,
+             palette    = "Set2",
+             addEllipses = TRUE,
+             ellipse.type = "confidence",
+             legend.title = "Kategoria",
+             repel = TRUE) +
+  labs(title = "Produkty w przestrzeni PC1 × PC2",
+       subtitle = "Kolorowanie wg rzeczywistej kategorii żywności") +
+  theme_minimal()
+```
+
+> **⚠️ Pułapka:** Kolumna `group` **nie brała udziału** w obliczaniu
+> PCA - służy jedynie do kolorowania. To dobra walidacja: jeśli
+> rzeczywiste grupy tworzą widoczne skupiska na mapie PCA, to składniki
+> odżywcze rzeczywiście różnicują kategorie żywności.
+
+## Biplot - zmienne i obserwacje razem (\*)
+
+Biplot nakłada na siebie wykres obserwacji i wykres ładunków, dzięki
+czemu widać, które składniki charakteryzują które produkty. Produkty
+leżące w kierunku strzałki danej zmiennej mają w niej wysokie wartości -
+np. mięso i ryby (prawo-góra) wskazują w stronę białka, fosforu i
+witaminy B2, a owoce i warzywa (lewo) w stronę błonnika, witaminy C i
+węglowodanów. To kluczowy wykres do interpretacji składowych PCA w
+kategoriach merytorycznych.
+
+```{r biplot, fig.height = 6.5}
+fviz_pca_biplot(pca_result,
+                geom.ind   = "point",
+                col.ind    = df$group,
+                palette    = "Set2",
+                col.var    = "black",
+                repel      = TRUE,
+                addEllipses = FALSE,
+                legend.title = "Kategoria") +
+  labs(title = "Biplot — produkty i składniki na jednym wykresie") +
+  theme_minimal()
+```
+
+------------------------------------------------------------------------
+
+# Analiza skupień na składowych głównych
+
+## Przygotowanie danych - scores z PCA
+
+Używamy wyników (scores) z PCA zamiast oryginalnych zmiennych. Wybieramy
+tyle składowych, ile wskazało kryterium Kaisera.
+
+```{r pca-scores}
+n_comp <- n_kaiser
+scores <- as.data.frame(pca_result$ind$coord[, 1:n_comp])
+names(scores) <- paste0("PC", 1:n_comp)
+
+cat("Wymiary macierzy scores:", nrow(scores), "x", ncol(scores), "\n")
+head(scores)
+```
+
+> **📖 Dlaczego klastrujemy na scores, a nie na oryginalnych danych?**
+>
+> 1.  Składowe PCA są **nieskorelowane** - algorytm k-średnich działa
+>     lepiej, bo metryka euklidesowa nie faworyzuje redundantnych
+>     kierunków.
+> 2.  **Redukcja szumu** - odrzucamy składowe o niskiej wariancji, które
+>     mogą reprezentować szum pomiarowy.
+> 3.  **Niższy wymiar** - mniej wymiarów oznacza stabilniejsze centroidy
+>     i mniejsze ryzyko „klątwy wymiarowości".
+
+> **Uwaga metodyczna:** W tej analizie metoda k-means nie jest
+> wykonywana bezpośrednio na pierwotnych zmiennych, lecz na wybranych
+> składowych PCA. Oznacza to, że produkty są grupowane na podstawie
+> głównych wymiarów zmienności składu odżywczego.
+>
+> Takie podejście ogranicza wpływ zmiennych silnie skorelowanych i
+> redukuje wymiar danych, ale jednocześnie powoduje, że interpretacja
+> skupień odbywa się pośrednio - przez powrót do średnich wartości
+> oryginalnych zmiennych w skupieniach.
+>
+> W tym wariancie **nie skalujemy** dodatkowo składowych PCA przed
+> analizą k-means. Oznacza to, że **pierwsze składowe**, które
+> wyjaśniają największą część zmienności danych, **mają największy
+> wpływ** na wynik grupowania. Jest to często uzasadnione, ponieważ
+> właśnie te składowe zawierają najwięcej informacji o strukturze
+> danych.
+>
+> Alternatywnie można rozważyć standaryzację wybranych składowych PCA
+> przed klasteryzacją. Wtedy każda zachowana składowa miałaby podobny
+> wpływ na k-means, ale tracimy naturalne ważenie składowych zgodnie z
+> ilością wyjaśnianej wariancji.
+
+## Dobór liczby skupień
+
+### Metoda łokcia (elbow method)
+
+Metoda łokcia pokazuje, jak spada *Inercja* czyli całkowita suma
+kwadratów odległości obserwacji od środka skupień, do których należą
+(WSS - *Within-Cluster Sum of Squares*) wraz ze wzrostem liczby skupień
+*k*. Każde dodatkowe skupienie zmniejsza WSS, ale szukamy punktu, w
+którym dalsze zwiększanie *k* przestaje dawać wyraźną poprawę. W tym
+przypadku krzywa opada dość łagodnie - łokieć nie jest jednoznaczny, co
+oznacza, że sama metoda WSS nie wystarczy do wyboru *k*. Dlatego
+wspomagamy się dodatkowym kryterium - średnim indeksem sylwetki.
+
+```{r elbow-method, fig.height = 4.5}
+fviz_nbclust(scores, kmeans,
+             method  = "wss",
+             k.max   = 10,
+             nstart  = 25) +
+  labs(title = "Metoda łokcia - Inercja",
+       x = "Liczba skupień (k)",
+       y = "Inercja") +
+  theme_minimal()
+```
+
+### Metoda sylwetki (silhouette)
+
+Wykres pokazuje średnią sylwetkę dla każdego k. W przeciwieństwie do
+metody łokcia, tu szukamy maksimum, a nie załamania. Wartość k z
+najwyższą średnią sylwetką to rekomendacja algorytmiczna, choć
+ostateczny wybór powinien uwzględniać także interpretowalność skupień.
+
+```{r silhouette-method, fig.height = 4.5}
+fviz_nbclust(scores, kmeans,
+             method  = "silhouette",
+             k.max   = 10,
+             nstart  = 25) +
+  labs(title = "Metoda sylwetki — średni indeks sylwetki",
+       x = "Liczba skupień (k)",
+       y = "Średni indeks sylwetki") +
+  theme_minimal()
+```
+
+> **📖 Przypomnienie teoretyczne - indeks sylwetki**
+>
+> Dla każdej obserwacji $i$ indeks sylwetki wynosi:
+>
+> $$ s(i) = \frac{b(i) - a(i)}{\max\{a(i), b(i)\}} $$
+>
+> gdzie $a(i)$ to średnia odległość do obiektów w **tym samym**
+> skupieniu, a $b(i)$ to średnia odległość do obiektów w **najbliższym
+> obcym** skupieniu.
+>
+> | $s(i)$   | Interpretacja                        |
+> |----------|--------------------------------------|
+> | bliski 1 | obiekt dobrze dopasowany             |
+> | ok. 0    | obiekt na granicy dwóch skupień      |
+> | ujemny   | obiekt prawdopodobnie źle przypisany |
+
+### Wybór optymalnej liczby skupień - do uzupełnienia
+
+W tym miejscu należy samodzielnie wybrać liczbę skupień na podstawie
+wykresu łokcia, średniej sylwetki oraz interpretowalności profili.
+
+```{r choose-k}
+# Uwaga:
+# W analizie skupień nie zawsze istnieje jedna "prawidłowa" liczba grup.
+# Wybór k powinien być uzasadniony zarówno statystycznie, jak i merytorycznie.
+
+# UZUPEŁNIJ:
+# Na podstawie wykresu łokcia, średniej sylwetki i interpretowalności profili
+# wpisz wybraną liczbę skupień.
+
+k_opt <- 4
+
+if (is.na(k_opt) || k_opt < 2 || k_opt > 10) {
+  stop("Uzupełnij k_opt liczbą całkowitą z zakresu 2–10.")
+}
+
+cat("Wybrana liczba skupień:", k_opt, "\n")
+```
+
+Proszę uzasadnić ten wybór na podstawie wykresu łokcia,\
+średniego indeksu sylwetki oraz możliwości sensownej interpretacji
+profili skupień.
+Kompromis między dwoma wykresami - inercji oraz średniego indeksu
+sylwetki - większa liczba skupień nie poprawia znacząco średniego
+indeksu sylwetki, a inercja zwalnia spadek
+## Budowa modelu k-średnich
+
+> **📖 Przypomnienie teoretyczne - algorytm k-średnich**
+>
+> 1.  Losowo inicjalizuj $k$ centroidów.
+> 2.  Przypisz każdy punkt do najbliższego centroidu.
+> 3.  Przelicz centroidy jako średnie punktów w skupieniu.
+> 4.  Powtarzaj punkt 2 i 3, aż centroidy się ustabilizują.
+>
+> **Ważne parametry:**
+>
+> - `nstart = 25` - algorytm powtarza się 25 razy z różnymi początkowymi
+>   centroidami i wybiera najlepszy wynik. To minimalizuje ryzyko
+>   utknięcia w minimum lokalnym.
+> - `iter.max = 100` - limit iteracji.
+> - `set.seed()` - zapewnia powtarzalność.
+
+```{r kmeans-fit}
+set.seed(42)
+
+km_result <- kmeans(scores,
+                    centers  = k_opt,
+                    nstart   = 25,
+                    iter.max = 100)
+
+# Przypisanie etykiet do danych
+df$cluster   <- factor(km_result$cluster)
+df_mm$cluster <- factor(km_result$cluster)
+scores$cluster <- factor(km_result$cluster)
+
+cat("Rozmiary skupień:\n")
+table(df$cluster)
+```
+
+## Wizualizacja skupień w przestrzeni PCA
+
+Wykres przedstawia wynik analizy skupień metodą k-średnich nałożony na
+dwie pierwsze składowe PCA. Elipsy wypukłe (*convex hulls*) obejmują
+wszystkie obserwacje w danym skupieniu - im mniej się nakładają, tym
+lepiej algorytm rozdzielił grupy. Warto zauważyć, że skupienia częściowo
+na siebie nachodzą, co sygnalizuje, że granica między nimi nie jest
+ostra wybrane obserwacje graniczne mogą mieć niski indeks sylwetki.
+
+```{r cluster-pca-plot, fig.height = 6}
+fviz_cluster(km_result, data = scores %>% dplyr::select(-cluster),
+             palette     = "Set2",
+             geom        = "point",
+             ellipse.type = "convex",
+             pointsize   = 2,
+             ggtheme     = theme_minimal()) +
+  labs(title = paste("Skupienia k-średnich (k =", k_opt, ") w przestrzeni PCA"),
+       subtitle = "Elipsy wypukłe obejmują wszystkie punkty skupienia")
+```
+
+## Wykres sylwetki dla wybranego rozwiązania
+
+Wykres sylwetki pokazuje indeks sylwetki każdej obserwacji, pogrupowany
+według skupień.\
+Obserwacje z wartościami bliskimi zera lub ujemnymi należy traktować
+jako potencjalnie problematyczne, ponieważ leżą na granicy skupień albo
+mogą być lepiej dopasowane do innego segmentu.
+
+```{r silhouette-plot, fig.height = 5}
+sil_vals <- silhouette(km_result$cluster,
+                       dist(scores %>% dplyr::select(-cluster)))
+
+fviz_silhouette(sil_vals, palette = "Set2") +
+  labs(title = paste("Wykres sylwetki (k =", k_opt, ")"),
+       subtitle = paste("Średnia sylwetka:",
+                        round(mean(sil_vals[, 3]), 3))) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+```
+
+------------------------------------------------------------------------
+
+# Profilowanie segmentów - interpretacja merytoryczna
+
+## Średnie wartości składników w skupieniach (dane po przygotowaniu)
+
+W tej części interpretujemy profile uzyskanych skupień na podstawie
+średnich wartości składników. Są to wartości w oryginalnych jednostkach
+pomiaru, ale po wcześniejszej imputacji braków danych oraz winsoryzacji
+wartości odstających.
+
+```{r cluster-means-original}
+cluster_profiles <- df %>%
+  group_by(cluster) %>%
+  summarise(
+    n = n(),
+    across(all_of(quantitative_vars), ~ round(mean(.x), 2)),
+    .groups = "drop"
+  )
+
+kable(cluster_profiles,
+      caption = "Profil odżywczy segmentów — wartości średnie")
+```
+
+## Średnie znormalizowane (Min-Max) - porównanie profili
+
+```{r cluster-means-minmax}
+cluster_profiles_mm <- df_mm %>%
+  group_by(cluster) %>%
+  summarise(
+    across(all_of(quantitative_vars), ~ round(mean(.x), 3)),
+    .groups = "drop"
+  )
+
+kable(cluster_profiles_mm,
+      caption = "Profil segmentów — średnie Min-Max [0–1]")
+```
+
+## Profil średnich
+
+```{r profile-line-plot, fig.height = 5}
+cluster_profiles_mm %>%
+  pivot_longer(-cluster, names_to = "variable", values_to = "mean_mm") %>%
+  ggplot(aes(x = variable, y = mean_mm,
+             colour = cluster, group = cluster)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  coord_flip() +
+  labs(title = "Profil składnikowy segmentów",
+       subtitle = "Średnie Min-Max (0 = minimum w zbiorze, 1 = maksimum)",
+       x = NULL, y = "Średnia znormalizowana") +
+  scale_colour_brewer(palette = "Set2") +
+  theme_minimal()
+```
+
+## Boxploty kluczowych zmiennych wg skupień
+
+```{r boxplots-by-cluster, fig.height = 10}
+df %>%
+  dplyr::select(cluster, all_of(quantitative_vars)) %>%
+  pivot_longer(-cluster, names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = cluster, y = value, fill = cluster)) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(~ variable, scales = "free_y", ncol = 3) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Rozkłady zmiennych w segmentach",
+       x = "Skupienie", y = "Wartość") +
+  theme_minimal(base_size = 10)
+```
+
+## Produkty w każdym segmencie
+
+```{r products-per-cluster}
+for (cl in sort(unique(df$cluster))) {
+  cat("\n### Skupienie", cl, "###\n")
+  products_in <- df %>%
+    filter(cluster == cl) %>%
+    dplyr::select(food_product, group) %>%
+    arrange(group)
+  print(kable(products_in))
+}
+```
+
+------------------------------------------------------------------------
+
+# Walidacja - porównanie z rzeczywistymi kategoriami
+
+## Tabela kontyngencji: skupienie × kategoria
+
+```{r contingency-table}
+cont_table <- table(df$cluster, df$group)
+kable(cont_table,
+      caption = "Tabela kontyngencji: skupienia × grupy żywności")
+```
+
+## Wizualizacja zgodności
+
+```{r cluster-vs-group, fig.height = 5}
+df %>%
+  dplyr::count(cluster, group) %>%
+  ggplot(aes(x = cluster, y = n, fill = group)) +
+  geom_col(position = "fill", colour = "white") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title = "Skład skupień wg rzeczywistych kategorii żywności",
+       x = "Skupienie", y = "Udział (%)", fill = "Kategoria") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+df %>%
+  dplyr::count(cluster, group) %>%
+  ggplot(aes(x = group, y = n, fill = cluster)) +
+  geom_col(position = "fill", colour = "white") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Rozmieszczenie kategorii żywności w skupieniach",
+       x = "Kategoria", y = "Udział (%)", fill = "Skupienie") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## Wskaźnik Randa (ARI) (\*)
+
+> **📖 Przypomnienie teoretyczne - Adjusted Rand Index**
+>
+> ARI mierzy **zgodność** dwóch podziałów zbioru na grupy, z korektą na
+> zgodność losową.
+>
+> | ARI       | Interpretacja      |
+> |-----------|--------------------|
+> | 1.0       | doskonała zgodność |
+> | \> 0.7    | dobra zgodność     |
+> | 0.5 – 0.7 | umiarkowana        |
+> | ok. 0     | losowa zgodność    |
+> | \< 0      | gorsze niż losowe  |
+
+```{r ari-score}
+ari <- adjustedRandIndex(df$cluster, df$group)
+
+cat("Adjusted Rand Index:", round(ari, 4), "\n")
+```
+
+> **⚠️ Pułapka:** ARI porównuje dwa podziały tych samych obserwacji.
+> Dlatego `df$cluster` i `df$group` muszą odnosić się do tych samych
+> produktów w tej samej kolejności.
+
+------------------------------------------------------------------------
+
+# Podsumowanie ścieżki analizy
+
+Przeszliśmy pełną ścieżkę od surowego pliku Excel do **zinterpretowanych
+segmentów** produktów spożywczych. Każdy krok zasilał kolejny:
+
+1.  **Wczytanie i przegląd** → zrozumienie struktury i skali zmiennych.
+2.  **Diagnostyka jakości** → identyfikacja braków (najgorzej: witamina
+    D -32 %).
+3.  **Czyszczenie danych** → dwuetapowa imputacja (mediana + kNN),
+    winsoryzacja outlierów.
+4.  **Analiza korelacji** → eliminacja energii (pochodna
+    makroskładników).
+5.  **Standaryzacja** → wyrównanie skal przed PCA.
+6.  **PCA** → redukcja wymiarowości z zachowaniem struktury wariancji.
+7.  **Dobór k** → metoda łokcia i sylwetki.
+8.  **k-średnie na scores** → segmentacja w zredukowanej przestrzeni.
+9.  **Profilowanie** → merytoryczna interpretacja segmentów.
+10. **Walidacja** → porównanie z rzeczywistymi kategoriami (ARI).
+
+## Kluczowe lekcje
+
+- **Ponad połowa pracy to przygotowanie danych.** Imputacja i
+  standaryzacja decydują o tym, czy algorytm widzi prawdziwą strukturę,
+  czy artefakty.
+- **PCA nie jest celem, lecz narzędziem.** Służy do uproszczenia
+  problemu - ładunki pomagają zrozumieć, co każda składowa „mierzy".
+- **Liczba skupień to decyzja analityka**, nie algorytmu. Wskaźniki
+  (łokieć, sylwetka) dają wskazówki, ale ostateczny wybór wymaga
+  interpretacji merytorycznej.
+- **Walidacja jest obowiązkowa.** Nawet gdy nie mamy etykiet, sprawdzamy
+  sensowność segmentów (czy profile dają się wyjaśnić).
+
+------------------------------------------------------------------------
+
+# Zadania do samodzielnej realizacji
+
+W zadaniach korzystamy z obiektów utworzonych w głównej części analizy:
+
+- `df` - dane po czyszczeniu, imputacji i winsoryzacji,
+- `quantitative_vars` - lista zmiennych ilościowych używanych w
+  analizie,
+- `scores` - współrzędne produktów w przestrzeni PCA,
+- `k_opt` - liczba skupień przyjęta w głównej analizie k-means,
+- `km_result` - model k-means wykonany na wynikach PCA,
+- `df$group` - oryginalna kategoria produktu, używana wyłącznie do
+  walidacji.
+
+# Zadanie 1 - k-średnich na oryginalnych zmiennych skalowanych metodą Min-Max
+
+W głównej analizie wykonaliśmy klasteryzację k-średnich na wynikach PCA,
+czyli na zredukowanej reprezentacji danych. Teraz sprawdzimy, co się
+stanie, jeżeli ten sam algorytm zastosujemy do **oryginalnych zmiennych
+ilościowych po skalowaniu**.
+
+> **Ważne:** nie wykonujemy k-średnich na dosłownie surowych danych.
+> Algorytm k-średnich jest oparty na odległościach, dlatego zmienne o
+> dużych wartościach liczbowych mogłyby zdominować wynik. Z tego powodu
+> najpierw wybieramy zmienne ilościowe i wykonujemy skalowanie.
+
+**Cel zadania:** porównać dwa warianty klasteryzacji:
+
+1.  k-średnich na wynikach PCA,
+2.  k-średnich na oryginalnych zmiennych po skalowaniu.
+
+Na końcu porównamy zgodność obu rozwiązań za pomocą ARI oraz zobaczymy,
+czy podziały wyglądają podobnie na mapie dwóch pierwszych składowych
+PCA.
+
+## Krok 1 - wybór zmiennych do klasteryzacji
+
+Wybierzemy te same zmienne ilościowe, które były wykorzystywane
+wcześniej w analizie PCA. Dzięki temu porównanie będzie uczciwe:
+zmieniamy reprezentację danych, ale nie zmieniamy zestawu zmiennych
+wejściowych.
+
+```{r zad1-wybor-zmiennych}
+# Zmienne ilościowe użyte wcześniej w analizie
+original_kmeans_vars <- quantitative_vars
+
+cat("Liczba zmiennych użytych w k-means na danych oryginalnych:",
+    length(original_kmeans_vars), "\n\n")
+
+cat("Zmienne:\n")
+cat(paste(original_kmeans_vars, collapse = ", "), "\n")
+```
+
+## Krok 2 - przygotowanie macierzy danych
+
+Tworzymy macierz danych zawierającą wyłącznie zmienne ilościowe. To jest
+reprezentacja „oryginalna", czyli przed PCA, ale po wcześniejszym
+oczyszczeniu danych wykonanym w głównej części analizy.
+
+```{r zad1-macierz-danych}
+kmeans_original_matrix <- dplyr::select(all_of(original_kmeans_vars)) %>%
+  as.matrix()
+
+cat("Wymiary macierzy danych oryginalnych:",
+    nrow(kmeans_original_matrix), "x", ncol(kmeans_original_matrix), "\n")
+```
+
+## Krok 3 - skalowanie zmiennych metodą Min-Max - do uzupełnienia
+
+Skalujemy zmienne, aby były w zakresie [0,1]. Jest to konieczne,
+ponieważ k-średnich porównuje obserwacje za pomocą odległości.
+
+```{r zad1-skalowanie-minmax}
+# UZUPEŁNIJ:
+kmeans_original_scaled <- df %>%
+  mutate(across(all_of(quantitative_vars), min_max_scale))
+```
+
+## Krok 4 - wybór liczby skupień
+
+Aby porównanie z wcześniejszym modelem PCA było czytelne, użyjemy tej
+samej liczby skupień `k_opt`, która została wybrana w głównej analizie.
+
+```{r zad1-wybor-k}
+k_original <- k_opt
+
+cat("Liczba skupień użyta w k-means na danych oryginalnych:", k_original, "\n")
+```
+
+## Krok 5 - wykonanie k-średnich na zmiennych oryginalnych - do uzupełnienia
+
+Teraz wykonujemy algorytm k-średnich na skalowanych zmiennych
+oryginalnych. Ustawiamy `nstart = 50`, aby algorytm wystartował z wielu
+losowych konfiguracji i wybrał najlepsze znalezione rozwiązanie.
+
+```{r zad1-kmeans-fit}
+
+# UZUPEŁNIJ:
+km_original <- kmeans(kmeans_original_scaled[quantitative_vars],
+                    centers  = k_original,
+                    nstart   = 50,
+                    iter.max = 100)
+
+
+cluster_kmeans_original <- km_original$cluster
+
+km_original
+```
+
+## Krok 6 - liczebności skupień
+
+Sprawdzamy, czy algorytm utworzył skupienia o podobnej liczebności, czy
+może jedno ze skupień jest bardzo małe lub bardzo duże.
+
+```{r zad1-liczebnosci}
+tibble(
+  cluster_original = factor(cluster_kmeans_original)
+) %>%
+  dplyr::count(cluster_original, name = "n") %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  kable(
+    caption = "Liczebności skupień — k-means na zmiennych oryginalnych",
+    digits = 1
+  )
+```
+
+## Krok 7 - jakość rozwiązania: sylwetka - do uzupełnienia
+
+Obliczamy średni indeks sylwetki dla klasteryzacji wykonanej na
+zmiennych oryginalnych. Im wyższa wartość, tym lepiej obserwacje pasują
+do własnych skupień i jednocześnie odróżniają się od innych skupień.
+
+```{r zad1-silhouette}
+# UZUPEŁNIJ:
+# Oblicz obiekt sylwetki dla wyniku k-means na zmiennych oryginalnych.
+# Wykorzystaj:
+# - przypisania skupień: km_original$cluster
+# - macierz odległości: dist(kmeans_original_scaled)
+
+sil_original <- silhouette(km_original$cluster,
+                       dist(kmeans_original_matrix))
+
+# UZUPEŁNIJ:
+# Oblicz średni indeks sylwetki na podstawie kolumny "sil_width".
+
+mean_sil_original <- mean(sil_original$sil_width)
+
+stop("Uzupełnij kod obliczania indeksu sylwetki w tym chunku i usuń tę linię stop().")
+
+cat("Średni indeks sylwetki dla k-means na zmiennych oryginalnych:",
+    round(mean_sil_original, 4), "\n")
+```
+
+## Krok 8 - wykres sylwetki - do uzupełnienia
+
+Wykres sylwetki pozwala zobaczyć, czy poszczególne obserwacje są dobrze
+przypisane do swoich skupień. Obserwacje z wartościami bliskimi zera lub
+ujemnymi są potencjalnie problematyczne.
+
+```{r zad1-silhouette-plot, fig.height = 5}
+
+# UZUPEŁNIJ:
+# Narysuj wykres sylwetki dla obiektu sil_original.
+# Możesz wykorzystać funkcję:
+# factoextra::fviz_silhouette()
+
+# ...
+fviz_silhouette(sil_original, palette = "Set2") +
+  labs(title = paste("Wykres sylwetki (k =", k_opt, ")"),
+       subtitle = paste("Średnia sylwetka:",
+                        round(mean(sil_vals[, 3]), 3))) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+stop("Uzupełnij kod tworzenia wykresu sylwetki w tym chunku i usuń tę linię stop().")
+```
+
+## Krok 9 - zgodność z oryginalną zmienną `group` - do uzupełnienia
+
+Jeżeli w danych mamy oryginalną etykietę grupy produktu, możemy
+sprawdzić, na ile klasteryzacja odtwarza ten znany podział. Używamy do
+tego indeksu ARI.
+
+```{r zad1-ari-vs-group}
+# UZUPEŁNIJ:
+# Oblicz indeks ARI porównujący skupienia uzyskane metodą k-means
+# z oryginalną zmienną grupującą `group`.
+#
+# Wykorzystaj:
+# - przypisania skupień: km_original$cluster
+# - oryginalne etykiety grup: df$group
+# - funkcję: mclust::adjustedRandIndex()
+
+# ari_original_vs_group <- ...
+
+stop("Uzupełnij kod obliczania ARI w tym chunku i usuń tę linię stop().")
+
+cat("ARI: k-means oryginalne vs group =",
+    round(ari_original_vs_group, 4), "\n")
+```
+
+## Krok 10 - porównanie z wcześniejszym k-means na PCA
+
+Teraz porównamy nowe rozwiązanie z klasteryzacją wykonaną wcześniej na
+wynikach PCA. Jeżeli ARI jest wysokie, oznacza to, że oba warianty dają
+podobny podział obserwacji.
+
+```{r zad1-porownanie-ari}
+cluster_kmeans_pca <- scores$cluster
+
+ari_original_vs_pca <- adjustedRandIndex(
+  cluster_kmeans_original,
+  cluster_kmeans_pca
+)
+
+ari_pca_vs_group <- adjustedRandIndex(
+  cluster_kmeans_pca,
+  df$group
+)
+
+ari_comparison <- tibble(
+  porownanie = c(
+    "k-means oryginalne vs k-means PCA",
+    "k-means oryginalne vs group",
+    "k-means PCA vs group"
+  ),
+  ARI = c(
+    ari_original_vs_pca,
+    ari_original_vs_group,
+    ari_pca_vs_group
+  )
+)
+
+ari_comparison %>%
+  kable(
+    caption = "Porównanie zgodności rozwiązań k-means za pomocą ARI",
+    digits = 4
+  )
+```
+
+## Krok 11 - tabela krzyżowa: klastry PCA vs klastry oryginalne
+
+Tabela krzyżowa pokazuje, jak obserwacje przypisane do klastrów w jednym
+wariancie rozkładają się w klastrach drugiego wariantu. Jest to bardziej
+szczegółowe uzupełnienie wartości ARI.
+
+```{r zad1-tabela-krzyzowa}
+cluster_cross_table <- table(
+  `k-means PCA` = cluster_kmeans_pca,
+  `k-means oryginalne` = factor(cluster_kmeans_original)
+)
+
+cluster_cross_table
+```
+
+## Krok 12 - wersja procentowa tabeli krzyżowej
+
+Dla łatwiejszej interpretacji można pokazać tę samą tabelę w procentach
+wierszowych. Dzięki temu widać, czy obserwacje z danego klastra PCA
+trafiają głównie do jednego klastra w modelu na zmiennych oryginalnych.
+
+```{r zad1-tabela-krzyzowa-pct}
+prop.table(cluster_cross_table, margin = 1) %>%
+  round(3) %>%
+  kable(
+    caption = "Tabela krzyżowa w procentach wierszowych: PCA vs oryginalne"
+  )
+```
+
+## Krok 13 - przygotowanie danych do porównania wizualnego
+
+Do wizualizacji użyjemy mapy PCA, ponieważ pozwala pokazać oba
+rozwiązania w tej samej dwuwymiarowej przestrzeni. Kolory będą oznaczały
+przypisania klastrów z dwóch różnych wariantów k-means.
+
+```{r zad1-dane-wizualne}
+compare_kmeans_data <- scores %>%
+  mutate(
+    cluster_pca = factor(cluster_kmeans_pca),
+    cluster_original = factor(cluster_kmeans_original),
+    group = df$group
+  )
+
+head(compare_kmeans_data)
+```
+
+## Krok 14 - wizualne porównanie obu rozwiązań
+
+Porównujemy dwa wykresy: po lewej stronie klastry uzyskane na danych
+PCA, a po prawej stronie klastry uzyskane na oryginalnych zmiennych
+skalowanych metodą Min-Max. Oba wykresy są narysowane w przestrzeni
+pierwszych dwóch składowych PCA, żeby można było je łatwo porównać
+wizualnie.
+
+```{r zad1-porownanie-wizualne, fig.height = 5, fig.width = 11}
+p_kmeans_pca <- ggplot(compare_kmeans_data,
+                       aes(x = PC1, y = PC2, colour = cluster_pca)) +
+  geom_point(size = 2, alpha = 0.8) +
+  labs(
+    title = "k-means na danych PCA",
+    x = "PC1",
+    y = "PC2",
+    colour = "Klaster"
+  ) +
+  theme_minimal()
+
+p_kmeans_original <- ggplot(compare_kmeans_data,
+                            aes(x = PC1, y = PC2, colour = cluster_original)) +
+  geom_point(size = 2, alpha = 0.8) +
+  labs(
+    title = "k-means na zmiennych oryginalnych",
+    x = "PC1",
+    y = "PC2",
+    colour = "Klaster"
+  ) +
+  theme_minimal()
+
+p_kmeans_pca + p_kmeans_original
+```
+
+## Krok 15 - zbiorcze porównanie metryk
+
+Na koniec zestawiamy oba warianty w jednej tabeli. Trzeba pamiętać, że
+`tot.withinss` nie jest bezpośrednio porównywalne między danymi PCA i
+danymi oryginalnymi, bo obliczane jest w innych przestrzeniach. Bardziej
+interpretowalne są ARI oraz średnia sylwetka liczona w przestrzeni, w
+której wykonano daną klasteryzację.
+
+```{r zad1-metryki-zbiorcze}
+pca_data_for_metrics <- scores %>%
+  dplyr::select(starts_with("PC"))
+
+sil_pca <- silhouette(
+  as.integer(cluster_kmeans_pca),
+  dist(pca_data_for_metrics)
+)
+
+mean_sil_pca <- mean(sil_pca[, 3])
+
+kmeans_metrics_summary <- tibble(
+  wariant = c(
+    "k-means na danych PCA",
+    "k-means na zmiennych oryginalnych"
+  ),
+  k = c(
+    length(unique(cluster_kmeans_pca)),
+    length(unique(cluster_kmeans_original))
+  ),
+  mean_silhouette = c(
+    mean_sil_pca,
+    mean_sil_original
+  ),
+  ARI_vs_group = c(
+    ari_pca_vs_group,
+    ari_original_vs_group
+  ),
+  ARI_vs_drugi_wariant = c(
+    ari_original_vs_pca,
+    ari_original_vs_pca
+  ),
+  tot_withinss = c(
+    km_result$tot.withinss,
+    km_original$tot.withinss
+  )
+)
+
+kmeans_metrics_summary %>%
+  kable(
+    caption = "Porównanie k-means na danych PCA i na zmiennych oryginalnych",
+    digits = 4
+  )
+```
+
+## Pytania kontrolne
+
+1.  Czy k-means na danych PCA i k-means na zmiennych oryginalnych dają
+    podobny podział obserwacji?
+2.  Który wariant ma wyższy ARI względem zmiennej `group`?
+3.  Czy średnia sylwetka jest podobna w obu wariantach?
+4.  Dlaczego `tot.withinss` nie jest idealną miarą do bezpośredniego
+    porównania tych dwóch wariantów?
+5.  Czy PCA uprościło strukturę danych w sposób korzystny dla
+    klasteryzacji, czy raczej zmieniło wynik podziału?
+
+## Kryteria zaliczenia zadania
+
+1.  Poprawnie wybrano i uzasadniono liczbę skupień.
+2.  Poprawnie wykonano skalowanie Min-Max zmiennych ilościowych.
+3.  Poprawnie uruchomiono algorytm k-średnich na zmiennych oryginalnych.
+4.  Poprawnie obliczono i zinterpretowano średni indeks sylwetki.
+5.  Poprawnie obliczono ARI i porównano wariant PCA z wariantem na
+    zmiennych oryginalnych.
+6.  Wnioski odnoszą się zarówno do wartości metryk, jak i do
+    interpretowalności skupień.
+
+*Koniec sekcji z zadaniami. Powodzenia!*
