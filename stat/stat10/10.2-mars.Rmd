@@ -1,0 +1,168 @@
+---
+title: "MARS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Otwarta implementacja modelu MARS jest dostępna w pakiecie `earth`. 
+
+```{r}
+library(earth)
+```
+
+### Regresja
+
+Analizujemy zależność mediany ceny od pozostałych zmiennych w zbiorze danych
+`MASS::Boston`.
+
+```{r}
+library(MASS)
+head(Boston)
+```
+
+Dopasowujemy model MARS bez interakcji (czyli model addytywny).
+
+```{r}
+medv_mars <- earth(medv ~ ., data = Boston)
+summary(medv_mars)
+```
+
+Dostępne wykresy diagnostyczne:
+
+- wykres selekcji modelu,
+
+- wykres dystrybuanty rezyduów,
+
+- wykres rezyduów względem wartości dopasowanych (*Residuals vs. Fitted*)
+
+- wykres kwantylowy.
+
+```{r}
+plot(medv_mars)
+```
+
+Ważność predyktorów
+
+```{r}
+medv_mars_evimp <- evimp(medv_mars)
+medv_mars_evimp
+```
+
+Ważność predyktorów na obrazku
+
+```{r}
+plot(medv_mars_evimp)
+```
+
+Wykresy częściowej zależności
+
+```{r}
+plotmo(medv_mars, pmethod = "partdep", degree1 = c("rm", "lstat"))
+```
+
+MARS z poziomem interakcji 2
+
+```{r}
+medv_mars_d2 <- earth(medv ~ ., data = Boston, degree = 2)
+summary(medv_mars_d2)
+```
+
+Ważność predyktorów
+
+```{r}
+evimp(medv_mars_d2) |> plot()
+```
+
+Wykresy częściowej zależności
+
+```{r}
+plotmo(medv_mars_d2, pmethod = "partdep", degree1 = c("rm", "lstat"), degree2 = c("rm", "lstat"))
+```
+
+Porównanie modeli (obrazkowe)
+
+```{r}
+plot.earth.models(list(medv_mars, medv_mars_d2))
+```
+
+Oszacowanie błędu testowego przy pomocy zbioru walidacyjnego.
+
+```{r}
+set.seed(2025)
+n <- nrow(Boston)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+medv_mars_subset <- earth(medv ~ ., data = Boston, subset = train)
+medv_mars_subset_pred <- predict(medv_mars_subset, Boston[test,])
+mean((medv_mars_subset_pred - Boston$medv[test])^2)
+
+medv_mars_d2_subset <- earth(medv ~ ., data = Boston, subset = train, degree = 2)
+medv_mars_d2_subset_pred <- predict(medv_mars_d2_subset, Boston[test,])
+mean((medv_mars_d2_subset_pred - Boston$medv[test])^2)
+```
+
+### Klasyfikacja (GLM)
+
+Wykorzystujemy przekształcony zbiór danych `ISLR::Carseats`.
+
+```{r}
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+head(CarseatsH)
+```
+
+
+Dopasowujemy model MARS z GLM bez interakcji (czyli model addytywny).
+
+```{r}
+csh_mars <- earth(High ~ . - Sales, data = CarseatsH, glm = list(family = binomial))
+summary(csh_mars)
+```
+
+Standardowe wykresy diagnostyczne dotyczą głównie MARS z numeryczną zmienną
+odpowiedzi. Dla GLM dostępny jest specjalny wykres rozkładu wartości zmiennej
+odpowiedzi.
+
+```{r}
+plotd(csh_mars)
+```
+
+Ważność predyktorów
+
+```{r}
+evimp(csh_mars) |> plot()
+```
+
+Wykresy częściowej zależności
+
+```{r}
+plotmo(csh_mars, pmethod = "partdep", degree1 = c("ShelveLoc", "^Price", "Advertising"),
+       degree2 = c("^Price", "Advertising"))
+```
+
+Metodą zbioru walidacyjnego estymujemy błąd testowy.
+
+```{r}
+set.seed(1)
+n <- nrow(CarseatsH)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+csh_mars_subset <- earth(High ~ . - Sales, data = CarseatsH, subset = train, 
+                         glm = list(family = binomial))
+csh_mars_subset_prob <- predict(csh_mars_subset, CarseatsH[test, ], type = "response")
+csh_mars_subset_pred <- ifelse(csh_mars_subset_prob > 0.5, "Yes", "No")
+mean(csh_mars_subset_pred != CarseatsH$High[test])
+
+csh_mars_d2_subset <- earth(High ~ . - Sales, data = CarseatsH, subset = train, 
+                            degree = 2, glm = list(family = binomial))
+csh_mars_d2_subset_prob <- predict(csh_mars_d2_subset, CarseatsH[test, ], type = "response")
+csh_mars_d2_subset_pred <- ifelse(csh_mars_d2_subset_prob > 0.5, "Yes", "No")
+mean(csh_mars_d2_subset_pred != CarseatsH$High[test])
+```

@@ -1,0 +1,37 @@
+
+Call:
+glm(formula = formula_full, family = binomial, data = train_data)
+
+Coefficients:
+                       Estimate Std. Error z value Pr(>|z|)    
+(Intercept)          -3.065e+01  1.978e+00 -15.489  < 2e-16 ***
+wind_speed_10m        3.486e-01  1.533e-02  22.734  < 2e-16 ***
+wind_speed_100m       1.422e-01  9.103e-03  15.626  < 2e-16 ***
+wind_gusts_10m        4.011e-01  5.828e-03  68.831  < 2e-16 ***
+wind_dir_sin         -1.292e-02  2.366e-02  -0.546 0.584956    
+wind_dir_cos         -3.008e-02  3.001e-02  -1.003 0.316072    
+temperature_2m       -6.419e-02  6.645e-02  -0.966 0.334065    
+relative_humidity_2m  3.715e-02  1.005e-02   3.698 0.000217 ***
+dew_point_2m         -2.542e-01  5.027e-02  -5.057 4.27e-07 ***
+apparent_temperature  2.415e-01  4.996e-02   4.833 1.34e-06 ***
+precipitation         5.773e-01  5.168e-02  11.170  < 2e-16 ***
+cloud_cover           5.320e-03  5.305e-04  10.028  < 2e-16 ***
+pressure_msl         -5.871e-03  1.649e-03  -3.560 0.000371 ***
+shortwave_radiation   2.660e-03  1.697e-04  15.672  < 2e-16 ***
+is_day                4.927e-02  6.366e-02   0.774 0.438969    
+sin_dzien            -1.260e-01  3.555e-02  -3.543 0.000395 ***
+cos_dzien            -2.591e-01  7.030e-02  -3.686 0.000228 ***
+sin_godzina           5.540e-01  2.325e-02  23.829  < 2e-16 ***
+cos_godzina          -3.070e-01  4.878e-02  -6.293 3.12e-10 ***
+polrocze_cieple      -6.377e-02  6.980e-02  -0.914 0.360882    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 197001  on 229198  degrees of freedom
+Residual deviance:  28713  on 229179  degrees of freedom
+AIC: 28753
+
+Number of Fisher Scoring iterations: 10
+

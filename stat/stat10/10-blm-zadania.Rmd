@@ -1,0 +1,1108 @@
+---
+title: "Bagging, lasy losowe i MARS - zadania"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Drzewa decyzyjne są zaimplementowane w pakiecie `rpart` (nieco odmienna
+implementacja dostępna jest w pakiecie `tree`). Dla uzyskania bogatszej
+(i ładniejszej) wizualizacji drzew warto skorzystać z pakietu `rpart.plot`.
+
+```{r}
+library(rpart)
+library(rpart.plot)
+```
+
+### Drzewa klasyfikacyjne
+
+Poniższy kod wykorzystuje zbiór danych `Carseats` z pakietu `ISLR`. Będziemy
+klasyfikować obserwacje do dwóch klas: **wysoka sprzedaż** i **niska sprzedaż**.
+Uzupełniamy zbiór danych o zmienną objaśnianą w zadaniu klasyfikacji.
+
+```{r CarseatsDS}
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+head(CarseatsH)
+```
+
+Budujemy drzewo klasyfikacyjne do predykcji `High` na podstawie pozostałych
+zmiennych (poza `Sales`).
+
+```{r classTree}
+sales_high_rpart <- rpart(High ~ . - Sales, data = CarseatsH)
+plot(sales_high_rpart, margin = 0.1, minbranch = 1.5)
+text(sales_high_rpart, pretty = 0)
+```
+
+Ładniejsze przedstawienie graficzne dopasowanego modelu
+
+```{r}
+rpart.plot(sales_high_rpart)
+```
+
+Drzewo w postaci zbioru reguł
+
+```{r}
+rpart.rules(sales_high_rpart)
+```
+
+Szczegóły struktury drzewa w postaci tekstowej
+
+```{r}
+sales_high_rpart
+```
+
+Podstawowe informacje o modelu łącznie z informacjami dotyczącymi ewentualnego
+przycinania
+
+```{r}
+printcp(sales_high_rpart)
+```
+
+Ważność predyktorów
+
+```{r}
+sales_high_rpart$variable.importance
+```
+
+#### Uwaga
+
+Bardzo szczegółowy raport na temat modelu produkuje funkcja `summary()`.
+Na ogół jest on bardzo długi.
+
+```{r eval=FALSE}
+summary(sales_high_rpart)
+```
+
+#### Estymacja błędu testowego
+
+Metodą zbioru walidacyjnego estymujemy błąd testowy dla drzewa klasyfikacyjnego
+w rozważanym problemie.
+
+```{r}
+set.seed(1)
+n <- nrow(CarseatsH)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+sales_high_big <- rpart(High ~ . - Sales, data = CarseatsH, subset = train)
+sales_high_big_predicted <- predict(sales_high_big, newdata = CarseatsH[test,], type = "class")
+table(sales_high_big_predicted, CarseatsH$High[test])
+mean(sales_high_big_predicted != CarseatsH$High[test])
+```
+
+**Duże** drzewo $T_0$ dla zbioru uczącego `CarseatsH[train,]`
+
+```{r}
+rpart.plot(sales_high_big)
+```
+
+Do znalezienia optymalnego poddrzewa stosujemy przycinanie stosowane złożonością.
+Poniższy wykres pokazuje zależność błędu walidacji krzyżowej od rozmiaru
+poddrzewa (i malejącego parametru złożoności).
+
+```{r}
+plotcp(sales_high_big)
+```
+
+Szczegółowe informacje pokazuje raport tekstowy. Kolumna `xerror` podaje wartości
+względnego błędu CV, a kolumna `CP` zawiera wartość parametru złożoności, który
+wykorzystywany do przycięcia drzewa.
+
+```{r}
+printcp(sales_high_big)
+```
+
+Wyznaczamy parametry drzewa o minimalnym błędzie CV
+
+```{r}
+n_min <- which.min(sales_high_big$cptable[, "xerror"])
+cp_min <- sales_high_big$cptable[n_min, "CP"]
+cp_min
+```
+
+i przycinamy duże drzewo do tego poddrzewa (czyli poddrzewa o 
+`r sales_high_big$cptable[n_min, "nsplit"] + 1` liściach).
+
+```{r}
+sales_high_pruned_min <- prune(sales_high_big, cp = cp_min)
+rpart.plot(sales_high_pruned_min)
+```
+
+Liczymy dla minimalnego poddrzewa błąd walidacyjny
+
+```{r}
+sales_high_pruned_min_predicted <- predict(sales_high_pruned_min, newdata = CarseatsH[test,], type = "class")
+table(sales_high_pruned_min_predicted, CarseatsH$High[test])
+mean(sales_high_pruned_min_predicted != CarseatsH$High[test])
+```
+
+Dla porównania wyznaczamy najmniejsze poddrzewo, którego błąd 
+CV mieści się
+w przedziale jednego błędu standardowego od błędu minimalnego (**reguła 1 SE**)
+
+```{r}
+limit <- sum(sales_high_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(sales_high_big$cptable[, "xerror"] < limit))
+cp_1se <- sales_high_big$cptable[n_1se, "CP"]
+cp_1se
+```
+
+i przycinamy duże drzewo do tego poddrzewa 
+(o `r sales_high_big$cptable[n_1se, "nsplit"] + 1` liściach)
+
+```{r}
+sales_high_pruned_1se <- prune(sales_high_big, cp = cp_1se)
+rpart.plot(sales_high_pruned_1se)
+```
+
+Liczymy dla tego poddrzewa błąd walidacyjny
+
+```{r}
+sales_high_pruned_1se_predicted <- predict(sales_high_pruned_1se, newdata = CarseatsH[test,], type = "class")
+table(sales_high_pruned_1se_predicted, CarseatsH$High[test])
+mean(sales_high_pruned_1se_predicted != CarseatsH$High[test])
+```
+
+### Drzewa regresyjne
+
+Używamy zbioru danych `Boston` z pakietu `MASS`. Konstruujemy drzewo decyzyjne
+dla problemu regresji `medv` względem pozostałych zmiennych.
+
+```{r}
+library(MASS)
+medv_rpart <- rpart(medv ~ ., data = Boston)
+rpart.plot(medv_rpart, digits = 4)
+```
+
+Struktura w postaci tekstowej. *Deviance* oznacza tutaj RSS.
+
+```{r}
+medv_rpart
+```
+
+Podstawowe informacje podsumowujące model.
+
+```{r}
+printcp(medv_rpart)
+```
+
+Ważność predyktorów
+
+```{r}
+medv_rpart$variable.importance
+```
+
+#### Estymacja błędu testowego
+
+Metodą zbioru walidacyjnego szacujemy błąd testowy (MSE).
+
+```{r medvtreeerror}
+set.seed(2025)
+n <- nrow(Boston)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+medv_big <- rpart(medv ~ ., data = Boston, subset = train)
+medv_big_pred <- predict(medv_big, newdata = Boston[test,])
+mean((medv_big_pred - Boston$medv[test])^2)
+```
+
+Struktura dużego drzewa
+
+```{r}
+rpart.plot(medv_big, digits = 4)
+```
+
+Wyznaczamy optymalne poddrzewo metodą przycinania sterowanego złożonością.
+
+```{r medv.tree.cv}
+plotcp(medv_big)
+```
+
+W postaci tekstowej
+
+```{r}
+medv_big$cptable
+```
+
+Optymalne w tym przypadku jest - jak widać - drzewo duże. Według reguły 1 SE
+można je jednak przyciąć do drzewa o 7 liściach.
+
+```{r}
+n_min <- which.min(medv_big$cptable[, "xerror"])
+limit <- sum(medv_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(medv_big$cptable[, "xerror"] < limit))
+cp_1se <- medv_big$cptable[n_1se - 1, "CP"]
+medv_pruned <- prune(medv_big, cp = cp_1se)
+rpart.plot(medv_pruned)
+```
+
+Estymata błędu testowego
+
+```{r}
+medv_pruned_pred <- predict(medv_pruned, newdata = Boston[test,])
+mean((medv_pruned_pred - Boston$medv[test])^2)
+```
+
+### Zadania
+
+1. Porównaj estymaty błędu testowego drzew decyzyjnych dla zbioru `Boston`
+z odpowiednią estymatą uzyskaną dla regresji liniowej.
+
+1. Porównaj estymaty błędu testowego drzew decyzyjnych dla zbioru `CarseatsH`
+z odpowiednimi estymatami uzyskanymi dla regresji logistycznej, LDA i QDA.
+
+1. Czy w poprzednich zadaniach występują predyktory istotne w modelu
+liniowym/logistycznym a nieistotne w modelu drzewa decyzyjnego? A na odwrót?
+
+1. Przeanalizuj przy pomocy drzew decyzyjnych zbiory danych `ISLR::Hitters` 
+i `titanic::titanic_train`. Sprawdź jakość predykcji przy pomocy zbioru
+walidacyjnego (w pierwszym przypadku) i zbioru testowego 
+(czyli `titanic::titanic_test` w drugim przypadku).
+
+
+---
+
+## Rozwiązanie rozszerzonych zadań 1--4
+
+Poniższe chunki można wkleić po sekcji **Zadania**. Kod używa tych samych zbiorów danych, co materiał o drzewach decyzyjnych, ale rozszerza porównania o:
+
+- bagging,
+- las losowy,
+- MARS addytywny (`degree = 1`),
+- MARS z interakcjami drugiego rzędu (`degree = 2`).
+
+```{r pakiety-rozszerzenie, message=FALSE, warning=FALSE}
+# W razie potrzeby najpierw zainstaluj brakujące pakiety:
+# install.packages(c("ISLR", "MASS", "rpart", "rpart.plot", "randomForest", "earth", "titanic", "dplyr"))
+
+library(ISLR)
+library(MASS)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(earth)
+library(titanic)
+library(dplyr)
+```
+
+### Funkcje pomocnicze
+
+```{r funkcje-pomocnicze}
+# MSE dla regresji
+mse <- function(y, y_hat) {
+  mean((y - y_hat)^2)
+}
+
+# Błąd klasyfikacji
+class_error <- function(y, y_hat) {
+  mean(y != y_hat)
+}
+
+# Moda, używana do imputacji brakujących wartości w zmiennych jakościowych
+moda <- function(x) {
+  ux <- na.omit(unique(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# Porządkowanie wyników w czytelnej tabeli
+pokaz_wyniki <- function(tab) {
+  tab[order(tab$Blad_testowy), ]
+}
+```
+
+## Zadanie 1 rozszerzone: `Boston`
+
+Porównujemy estymaty błędu testowego dla drzewa decyzyjnego, regresji liniowej, baggingu, lasu losowego oraz MARS z poziomem interakcji 1 i 2.
+
+```{r zad1-boston-rozszerzone}
+set.seed(2025)
+
+n <- nrow(Boston)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+Boston_train <- Boston[train, ]
+Boston_test <- Boston[test, ]
+
+# 1. Duże drzewo regresyjne
+medv_big <- rpart(medv ~ ., data = Boston_train)
+pred_tree_big <- predict(medv_big, newdata = Boston_test)
+mse_tree_big <- mse(Boston_test$medv, pred_tree_big)
+
+# 2. Drzewo przycięte regułą 1 SE
+n_min <- which.min(medv_big$cptable[, "xerror"])
+limit <- sum(medv_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(medv_big$cptable[, "xerror"] < limit))
+
+# Zabezpieczenie przed wyjściem poza zakres tabeli cp
+cp_1se <- if (n_1se > 1) {
+  medv_big$cptable[n_1se - 1, "CP"]
+} else {
+  medv_big$cptable[n_1se, "CP"]
+}
+
+medv_pruned <- prune(medv_big, cp = cp_1se)
+pred_tree_pruned <- predict(medv_pruned, newdata = Boston_test)
+mse_tree_pruned <- mse(Boston_test$medv, pred_tree_pruned)
+
+# 3. Regresja liniowa
+lm_boston <- lm(medv ~ ., data = Boston_train)
+pred_lm <- predict(lm_boston, newdata = Boston_test)
+mse_lm <- mse(Boston_test$medv, pred_lm)
+
+# 4. Bagging
+# W baggingu dla randomForest ustawiamy mtry = liczba wszystkich predyktorów.
+p_boston <- ncol(Boston_train) - 1
+
+set.seed(2025)
+bag_boston <- randomForest(
+  medv ~ .,
+  data = Boston_train,
+  mtry = p_boston,
+  ntree = 500,
+  importance = TRUE
+)
+pred_bag <- predict(bag_boston, newdata = Boston_test)
+mse_bag <- mse(Boston_test$medv, pred_bag)
+
+# 5. Las losowy
+# Dla regresji typowy wybór domyślny to około p/3.
+set.seed(2025)
+rf_boston <- randomForest(
+  medv ~ .,
+  data = Boston_train,
+  mtry = max(1, floor(p_boston / 3)),
+  ntree = 500,
+  importance = TRUE
+)
+pred_rf <- predict(rf_boston, newdata = Boston_test)
+mse_rf <- mse(Boston_test$medv, pred_rf)
+
+# 6. MARS addytywny, czyli bez interakcji
+mars1_boston <- earth(
+  medv ~ .,
+  data = Boston_train,
+  degree = 1
+)
+pred_mars1 <- predict(mars1_boston, newdata = Boston_test)
+mse_mars1 <- mse(Boston_test$medv, pred_mars1)
+
+# 7. MARS z interakcjami do rzędu 2
+mars2_boston <- earth(
+  medv ~ .,
+  data = Boston_train,
+  degree = 2
+)
+pred_mars2 <- predict(mars2_boston, newdata = Boston_test)
+mse_mars2 <- mse(Boston_test$medv, pred_mars2)
+
+wyniki_boston <- data.frame(
+  Model = c(
+    "Drzewo duże",
+    "Drzewo przycięte 1 SE",
+    "Regresja liniowa",
+    "Bagging",
+    "Las losowy",
+    "MARS degree = 1",
+    "MARS degree = 2"
+  ),
+  Blad_testowy = c(
+    mse_tree_big,
+    mse_tree_pruned,
+    mse_lm,
+    mse_bag,
+    mse_rf,
+    mse_mars1,
+    mse_mars2
+  )
+)
+
+pokaz_wyniki(wyniki_boston)
+```
+
+Ważność predyktorów w modelach zespołowych i MARS:
+
+```{r zad1-boston-waznosc}
+# Ważność w drzewie
+medv_big$variable.importance
+
+# Ważność w baggingu
+importance(bag_boston)
+
+# Ważność w lesie losowym
+importance(rf_boston)
+
+# Ważność w MARS degree = 1
+evimp(mars1_boston)
+
+# Ważność w MARS degree = 2
+evimp(mars2_boston)
+```
+
+## Zadanie 2 rozszerzone: `CarseatsH`
+
+Porównujemy drzewo klasyfikacyjne z regresją logistyczną, LDA, QDA, baggingiem, lasem losowym oraz MARS w wersji logistycznej.
+
+```{r zad2-carseats-rozszerzone}
+set.seed(1)
+
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+
+n <- nrow(CarseatsH)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+Carseats_train <- CarseatsH[train, ]
+Carseats_test <- CarseatsH[test, ]
+
+# 1. Duże drzewo klasyfikacyjne
+sales_high_big <- rpart(High ~ . - Sales, data = Carseats_train)
+pred_tree_big <- predict(sales_high_big, newdata = Carseats_test, type = "class")
+err_tree_big <- class_error(Carseats_test$High, pred_tree_big)
+
+# 2. Drzewo przycięte według minimalnego błędu CV
+n_min <- which.min(sales_high_big$cptable[, "xerror"])
+cp_min <- sales_high_big$cptable[n_min, "CP"]
+
+sales_high_pruned_min <- prune(sales_high_big, cp = cp_min)
+pred_tree_pruned_min <- predict(
+  sales_high_pruned_min,
+  newdata = Carseats_test,
+  type = "class"
+)
+err_tree_pruned_min <- class_error(Carseats_test$High, pred_tree_pruned_min)
+
+# 3. Drzewo przycięte regułą 1 SE
+limit <- sum(sales_high_big$cptable[n_min, c("xerror", "xstd")])
+n_1se <- min(which(sales_high_big$cptable[, "xerror"] < limit))
+cp_1se <- sales_high_big$cptable[n_1se, "CP"]
+
+sales_high_pruned_1se <- prune(sales_high_big, cp = cp_1se)
+pred_tree_pruned_1se <- predict(
+  sales_high_pruned_1se,
+  newdata = Carseats_test,
+  type = "class"
+)
+err_tree_pruned_1se <- class_error(Carseats_test$High, pred_tree_pruned_1se)
+
+# 4. Regresja logistyczna
+glm_carseats <- glm(
+  High ~ . - Sales,
+  data = Carseats_train,
+  family = binomial
+)
+prob_glm <- predict(glm_carseats, newdata = Carseats_test, type = "response")
+pred_glm <- factor(ifelse(prob_glm > 0.5, "Yes", "No"), levels = levels(CarseatsH$High))
+err_glm <- class_error(Carseats_test$High, pred_glm)
+
+# 5. LDA
+lda_carseats <- lda(High ~ . - Sales, data = Carseats_train)
+pred_lda <- predict(lda_carseats, newdata = Carseats_test)$class
+err_lda <- class_error(Carseats_test$High, pred_lda)
+
+# 6. QDA
+qda_carseats <- qda(High ~ . - Sales, data = Carseats_train)
+pred_qda <- predict(qda_carseats, newdata = Carseats_test)$class
+err_qda <- class_error(Carseats_test$High, pred_qda)
+
+# 7. Bagging
+p_carseats <- ncol(model.matrix(High ~ . - Sales, data = Carseats_train)) - 1
+
+set.seed(1)
+bag_carseats <- randomForest(
+  High ~ . - Sales,
+  data = Carseats_train,
+  mtry = p_carseats,
+  ntree = 500,
+  importance = TRUE
+)
+pred_bag <- predict(bag_carseats, newdata = Carseats_test)
+err_bag <- class_error(Carseats_test$High, pred_bag)
+
+# 8. Las losowy
+# Dla klasyfikacji typowy wybór to około sqrt(p).
+set.seed(1)
+rf_carseats <- randomForest(
+  High ~ . - Sales,
+  data = Carseats_train,
+  mtry = max(1, floor(sqrt(p_carseats))),
+  ntree = 500,
+  importance = TRUE
+)
+pred_rf <- predict(rf_carseats, newdata = Carseats_test)
+err_rf <- class_error(Carseats_test$High, pred_rf)
+
+# 9. MARS addytywny, wersja logistyczna
+mars1_carseats <- earth(
+  High ~ . - Sales,
+  data = Carseats_train,
+  degree = 1,
+  glm = list(family = binomial)
+)
+prob_mars1 <- predict(mars1_carseats, newdata = Carseats_test, type = "response")
+pred_mars1 <- factor(ifelse(prob_mars1 > 0.5, "Yes", "No"), levels = levels(CarseatsH$High))
+err_mars1 <- class_error(Carseats_test$High, pred_mars1)
+
+# 10. MARS z interakcjami do rzędu 2, wersja logistyczna
+mars2_carseats <- earth(
+  High ~ . - Sales,
+  data = Carseats_train,
+  degree = 2,
+  glm = list(family = binomial)
+)
+prob_mars2 <- predict(mars2_carseats, newdata = Carseats_test, type = "response")
+pred_mars2 <- factor(ifelse(prob_mars2 > 0.5, "Yes", "No"), levels = levels(CarseatsH$High))
+err_mars2 <- class_error(Carseats_test$High, pred_mars2)
+
+wyniki_carseats <- data.frame(
+  Model = c(
+    "Drzewo duże",
+    "Drzewo przycięte min CV",
+    "Drzewo przycięte 1 SE",
+    "Regresja logistyczna",
+    "LDA",
+    "QDA",
+    "Bagging",
+    "Las losowy",
+    "MARS degree = 1",
+    "MARS degree = 2"
+  ),
+  Blad_testowy = c(
+    err_tree_big,
+    err_tree_pruned_min,
+    err_tree_pruned_1se,
+    err_glm,
+    err_lda,
+    err_qda,
+    err_bag,
+    err_rf,
+    err_mars1,
+    err_mars2
+  )
+)
+
+pokaz_wyniki(wyniki_carseats)
+```
+
+Macierze pomyłek dla modeli zespołowych i MARS:
+
+```{r zad2-carseats-macierze}
+table(Prawdziwe = Carseats_test$High, Bagging = pred_bag)
+table(Prawdziwe = Carseats_test$High, Las_losowy = pred_rf)
+table(Prawdziwe = Carseats_test$High, MARS_1 = pred_mars1)
+table(Prawdziwe = Carseats_test$High, MARS_2 = pred_mars2)
+```
+
+Ważność predyktorów:
+
+```{r zad2-carseats-waznosc}
+# Ważność w drzewie
+sales_high_big$variable.importance
+
+# Ważność w baggingu
+importance(bag_carseats)
+
+# Ważność w lesie losowym
+importance(rf_carseats)
+
+# Ważność w MARS degree = 1
+evimp(mars1_carseats)
+
+# Ważność w MARS degree = 2
+evimp(mars2_carseats)
+```
+
+## Zadanie 3 rozszerzone: porównanie istotności predyktorów
+
+W modelu liniowym/logistycznym za istotne uznajemy predyktory z wartością `p < 0.05`.
+W drzewie, baggingu i lesie losowym za ważne uznajemy predyktory z dodatnią ważnością.
+W modelach MARS patrzymy na zmienne występujące w funkcjach bazowych.
+
+```{r zad3-porownanie-predyktorow}
+# Funkcja porządkująca nazwy współczynników z modeli liniowych.
+# Przy zmiennych jakościowych np. ShelveLocGood sprowadzamy nazwę do ShelveLoc.
+normalizuj_nazwy <- function(nazwy, zmienne) {
+  sapply(nazwy, function(z) {
+    pasuje <- zmienne[sapply(zmienne, function(v) startsWith(z, v))]
+    if (length(pasuje) > 0) pasuje[which.max(nchar(pasuje))] else z
+  })
+}
+
+# Zmienne w modelu Boston
+zmienne_boston <- setdiff(names(Boston), "medv")
+
+# Istotność w regresji liniowej dla Boston
+coef_lm_boston <- summary(lm_boston)$coefficients
+istotne_lm_boston_raw <- rownames(coef_lm_boston)[coef_lm_boston[, "Pr(>|t|)"] < 0.05]
+istotne_lm_boston_raw <- setdiff(istotne_lm_boston_raw, "(Intercept)")
+istotne_lm_boston <- unique(normalizuj_nazwy(istotne_lm_boston_raw, zmienne_boston))
+
+# Ważność w drzewie dla Boston
+wazne_tree_boston <- names(medv_big$variable.importance)
+
+# Ważność w lesie losowym dla Boston
+wazne_rf_boston <- rownames(importance(rf_boston))[importance(rf_boston)[, "%IncMSE"] > 0]
+
+# Zmienne w MARS dla Boston
+wazne_mars1_boston <- rownames(evimp(mars1_boston))
+wazne_mars2_boston <- rownames(evimp(mars2_boston))
+
+cat("Boston: istotne w regresji liniowej, ale nieważne w drzewie:\n")
+setdiff(istotne_lm_boston, wazne_tree_boston)
+
+cat("Boston: ważne w drzewie, ale nieistotne w regresji liniowej:\n")
+setdiff(wazne_tree_boston, istotne_lm_boston)
+
+cat("Boston: ważne w RF, ale nieistotne w regresji liniowej:\n")
+setdiff(wazne_rf_boston, istotne_lm_boston)
+
+cat("Boston: istotne w regresji liniowej, ale niewystępujące w MARS degree = 1:\n")
+setdiff(istotne_lm_boston, wazne_mars1_boston)
+
+cat("Boston: istotne w regresji liniowej, ale niewystępujące w MARS degree = 2:\n")
+setdiff(istotne_lm_boston, wazne_mars2_boston)
+
+
+# Zmienne w modelu CarseatsH
+zmienne_carseats <- setdiff(names(CarseatsH), c("High", "Sales"))
+
+# Istotność w regresji logistycznej dla CarseatsH
+coef_glm_carseats <- summary(glm_carseats)$coefficients
+istotne_glm_carseats_raw <- rownames(coef_glm_carseats)[coef_glm_carseats[, "Pr(>|z|)"] < 0.05]
+istotne_glm_carseats_raw <- setdiff(istotne_glm_carseats_raw, "(Intercept)")
+istotne_glm_carseats <- unique(normalizuj_nazwy(istotne_glm_carseats_raw, zmienne_carseats))
+
+# Ważność w drzewie dla CarseatsH
+wazne_tree_carseats <- names(sales_high_big$variable.importance)
+
+# Ważność w lesie losowym dla CarseatsH
+wazne_rf_carseats <- rownames(importance(rf_carseats))[importance(rf_carseats)[, "MeanDecreaseGini"] > 0]
+
+# Zmienne w MARS dla CarseatsH
+wazne_mars1_carseats <- rownames(evimp(mars1_carseats))
+wazne_mars2_carseats <- rownames(evimp(mars2_carseats))
+
+cat("CarseatsH: istotne w regresji logistycznej, ale nieważne w drzewie:\n")
+setdiff(istotne_glm_carseats, wazne_tree_carseats)
+
+cat("CarseatsH: ważne w drzewie, ale nieistotne w regresji logistycznej:\n")
+setdiff(wazne_tree_carseats, istotne_glm_carseats)
+
+cat("CarseatsH: ważne w RF, ale nieistotne w regresji logistycznej:\n")
+setdiff(wazne_rf_carseats, istotne_glm_carseats)
+
+cat("CarseatsH: istotne w regresji logistycznej, ale niewystępujące w MARS degree = 1:\n")
+setdiff(istotne_glm_carseats, wazne_mars1_carseats)
+
+cat("CarseatsH: istotne w regresji logistycznej, ale niewystępujące w MARS degree = 2:\n")
+setdiff(istotne_glm_carseats, wazne_mars2_carseats)
+```
+
+Interpretacja do wpisania pod wynikami:
+
+```{r zad3-interpretacja, eval=FALSE}
+# Predyktor może być istotny w modelu liniowym/logistycznym,
+# ale nieważny w drzewie, ponieważ model liniowy ocenia efekt globalny,
+# a drzewo wybiera tylko te zmienne, które dają najlepsze lokalne podziały.
+#
+# Odwrotna sytuacja też jest możliwa: drzewo lub las losowy może wykryć
+# nieliniowość albo interakcję, która nie jest dobrze opisana przez prosty
+# model liniowy/logistyczny.
+#
+# MARS jest modelem pośrednim: może wykrywać nieliniowości, a przy degree = 2
+# także interakcje między predyktorami.
+```
+
+## Zadanie 4 rozszerzone: `Hitters` i `titanic_train`
+
+Wykonujemy analizę z użyciem drzewa decyzyjnego, baggingu, lasu losowego, MARS addytywnego oraz MARS z interakcjami rzędu 2.
+
+### `Hitters`
+
+W zbiorze `Hitters` przewidujemy `Salary`. Usuwamy obserwacje z brakującym `Salary`, tak jak zwykle robi się w tym przykładzie.
+
+```{r zad4-hitters}
+set.seed(2025)
+
+Hitters_clean <- na.omit(Hitters)
+
+n <- nrow(Hitters_clean)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+Hitters_train <- Hitters_clean[train, ]
+Hitters_test <- Hitters_clean[test, ]
+
+# 1. Drzewo regresyjne
+tree_hitters <- rpart(Salary ~ ., data = Hitters_train)
+pred_tree <- predict(tree_hitters, newdata = Hitters_test)
+mse_tree <- mse(Hitters_test$Salary, pred_tree)
+
+# 2. Bagging
+p_hitters <- ncol(Hitters_train) - 1
+
+set.seed(2025)
+bag_hitters <- randomForest(
+  Salary ~ .,
+  data = Hitters_train,
+  mtry = p_hitters,
+  ntree = 500,
+  importance = TRUE
+)
+pred_bag <- predict(bag_hitters, newdata = Hitters_test)
+mse_bag <- mse(Hitters_test$Salary, pred_bag)
+
+# 3. Las losowy
+set.seed(2025)
+rf_hitters <- randomForest(
+  Salary ~ .,
+  data = Hitters_train,
+  mtry = max(1, floor(p_hitters / 3)),
+  ntree = 500,
+  importance = TRUE
+)
+pred_rf <- predict(rf_hitters, newdata = Hitters_test)
+mse_rf <- mse(Hitters_test$Salary, pred_rf)
+
+# 4. MARS addytywny
+mars1_hitters <- earth(
+  Salary ~ .,
+  data = Hitters_train,
+  degree = 1
+)
+pred_mars1 <- predict(mars1_hitters, newdata = Hitters_test)
+mse_mars1 <- mse(Hitters_test$Salary, pred_mars1)
+
+# 5. MARS z interakcjami rzędu 2
+mars2_hitters <- earth(
+  Salary ~ .,
+  data = Hitters_train,
+  degree = 2
+)
+pred_mars2 <- predict(mars2_hitters, newdata = Hitters_test)
+mse_mars2 <- mse(Hitters_test$Salary, pred_mars2)
+
+wyniki_hitters <- data.frame(
+  Zbior = "Hitters",
+  Model = c(
+    "Drzewo decyzyjne",
+    "Bagging",
+    "Las losowy",
+    "MARS degree = 1",
+    "MARS degree = 2"
+  ),
+  Blad_testowy_MSE = c(
+    mse_tree,
+    mse_bag,
+    mse_rf,
+    mse_mars1,
+    mse_mars2
+  )
+)
+
+pokaz_wyniki(wyniki_hitters)
+```
+
+Ważność predyktorów:
+
+```{r zad4-hitters-waznosc}
+tree_hitters$variable.importance
+importance(bag_hitters)
+importance(rf_hitters)
+evimp(mars1_hitters)
+evimp(mars2_hitters)
+```
+
+### `titanic_train` i `titanic_test`
+
+Uwaga praktyczna: w pakiecie `titanic` zbiór `titanic_test` zwykle nie zawiera prawdziwej kolumny `Survived`, więc nie da się policzyć realnego błędu testowego dla Kaggle test set. Dlatego kod poniżej:
+
+1. liczy estymatę błędu klasyfikacji na zbiorze walidacyjnym wydzielonym z `titanic_train`,
+2. dodatkowo generuje predykcje dla `titanic_test`,
+3. jeżeli lokalna wersja `titanic_test` zawiera kolumnę `Survived`, automatycznie policzy też błąd testowy.
+
+```{r zad4-titanic-przygotowanie}
+set.seed(2025)
+
+# Wybieramy zmienne, które są dostępne zarówno w train, jak i test.
+# Pomijamy Name, Ticket i Cabin, bo wymagają dodatkowego przetwarzania tekstowego
+# i mają dużo unikalnych wartości.
+zmienne_titanic <- c("Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked")
+
+titanic_train2 <- titanic_train[, c("Survived", zmienne_titanic)]
+titanic_test2 <- titanic_test[, zmienne_titanic]
+
+# Podział walidacyjny na podstawie titanic_train
+n <- nrow(titanic_train2)
+idx_train <- sample(n, 0.8 * n)
+idx_valid <- -idx_train
+
+tt_train <- titanic_train2[idx_train, ]
+tt_valid <- titanic_train2[idx_valid, ]
+
+# Funkcja przygotowująca dane Titanica.
+# Parametry imputacji wyznaczamy wyłącznie na zbiorze treningowym,
+# żeby nie podglądać danych walidacyjnych ani testowych.
+prep_titanic <- function(train_df, new_df, has_survived = TRUE) {
+  age_med <- median(train_df$Age, na.rm = TRUE)
+  fare_med <- median(train_df$Fare, na.rm = TRUE)
+  embarked_mode <- moda(train_df$Embarked)
+
+  prepare_one <- function(df, has_survived) {
+    if (has_survived) {
+      df$Survived <- factor(df$Survived, levels = c(0, 1), labels = c("No", "Yes"))
+    }
+
+    df$Pclass <- factor(df$Pclass)
+    df$Sex <- factor(df$Sex)
+    df$Embarked[df$Embarked == ""] <- NA
+    df$Embarked[is.na(df$Embarked)] <- embarked_mode
+    df$Embarked <- factor(df$Embarked)
+
+    df$Age[is.na(df$Age)] <- age_med
+    df$Fare[is.na(df$Fare)] <- fare_med
+
+    df
+  }
+
+  train_prepared <- prepare_one(train_df, has_survived = TRUE)
+  new_prepared <- prepare_one(new_df, has_survived = has_survived)
+
+  # Ujednolicenie poziomów czynników
+  new_prepared$Pclass <- factor(new_prepared$Pclass, levels = levels(train_prepared$Pclass))
+  new_prepared$Sex <- factor(new_prepared$Sex, levels = levels(train_prepared$Sex))
+  new_prepared$Embarked <- factor(new_prepared$Embarked, levels = levels(train_prepared$Embarked))
+
+  list(train = train_prepared, new = new_prepared)
+}
+
+prep_valid <- prep_titanic(tt_train, tt_valid, has_survived = TRUE)
+tt_train_p <- prep_valid$train
+tt_valid_p <- prep_valid$new
+```
+
+```{r zad4-titanic-modele-walidacja}
+# 1. Drzewo klasyfikacyjne
+tree_titanic <- rpart(Survived ~ ., data = tt_train_p)
+pred_tree <- predict(tree_titanic, newdata = tt_valid_p, type = "class")
+err_tree <- class_error(tt_valid_p$Survived, pred_tree)
+
+# 2. Bagging
+p_titanic <- ncol(model.matrix(Survived ~ ., data = tt_train_p)) - 1
+
+set.seed(2025)
+bag_titanic <- randomForest(
+  Survived ~ .,
+  data = tt_train_p,
+  mtry = p_titanic,
+  ntree = 500,
+  importance = TRUE
+)
+pred_bag <- predict(bag_titanic, newdata = tt_valid_p)
+err_bag <- class_error(tt_valid_p$Survived, pred_bag)
+
+# 3. Las losowy
+set.seed(2025)
+rf_titanic <- randomForest(
+  Survived ~ .,
+  data = tt_train_p,
+  mtry = max(1, floor(sqrt(p_titanic))),
+  ntree = 500,
+  importance = TRUE
+)
+pred_rf <- predict(rf_titanic, newdata = tt_valid_p)
+err_rf <- class_error(tt_valid_p$Survived, pred_rf)
+
+# 4. MARS addytywny, wersja logistyczna
+mars1_titanic <- earth(
+  Survived ~ .,
+  data = tt_train_p,
+  degree = 1,
+  glm = list(family = binomial)
+)
+prob_mars1 <- predict(mars1_titanic, newdata = tt_valid_p, type = "response")
+pred_mars1 <- factor(ifelse(prob_mars1 > 0.5, "Yes", "No"), levels = levels(tt_train_p$Survived))
+err_mars1 <- class_error(tt_valid_p$Survived, pred_mars1)
+
+# 5. MARS z interakcjami rzędu 2, wersja logistyczna
+mars2_titanic <- earth(
+  Survived ~ .,
+  data = tt_train_p,
+  degree = 2,
+  glm = list(family = binomial)
+)
+prob_mars2 <- predict(mars2_titanic, newdata = tt_valid_p, type = "response")
+pred_mars2 <- factor(ifelse(prob_mars2 > 0.5, "Yes", "No"), levels = levels(tt_train_p$Survived))
+err_mars2 <- class_error(tt_valid_p$Survived, pred_mars2)
+
+wyniki_titanic_valid <- data.frame(
+  Zbior = "Titanic -- walidacja z titanic_train",
+  Model = c(
+    "Drzewo decyzyjne",
+    "Bagging",
+    "Las losowy",
+    "MARS degree = 1",
+    "MARS degree = 2"
+  ),
+  Blad_testowy = c(
+    err_tree,
+    err_bag,
+    err_rf,
+    err_mars1,
+    err_mars2
+  )
+)
+
+pokaz_wyniki(wyniki_titanic_valid)
+```
+
+Macierze pomyłek:
+
+```{r zad4-titanic-macierze}
+table(Prawdziwe = tt_valid_p$Survived, Drzewo = pred_tree)
+table(Prawdziwe = tt_valid_p$Survived, Bagging = pred_bag)
+table(Prawdziwe = tt_valid_p$Survived, Las_losowy = pred_rf)
+table(Prawdziwe = tt_valid_p$Survived, MARS_1 = pred_mars1)
+table(Prawdziwe = tt_valid_p$Survived, MARS_2 = pred_mars2)
+```
+
+Predykcje dla `titanic_test`:
+
+```{r zad4-titanic-predykcje-test}
+# Trenujemy finalne modele na całym titanic_train.
+prep_final <- prep_titanic(titanic_train2, titanic_test2, has_survived = FALSE)
+
+tt_full_train_p <- prep_final$train
+tt_test_p <- prep_final$new
+
+final_tree_titanic <- rpart(Survived ~ ., data = tt_full_train_p)
+
+set.seed(2025)
+final_bag_titanic <- randomForest(
+  Survived ~ .,
+  data = tt_full_train_p,
+  mtry = p_titanic,
+  ntree = 500,
+  importance = TRUE
+)
+
+set.seed(2025)
+final_rf_titanic <- randomForest(
+  Survived ~ .,
+  data = tt_full_train_p,
+  mtry = max(1, floor(sqrt(p_titanic))),
+  ntree = 500,
+  importance = TRUE
+)
+
+final_mars1_titanic <- earth(
+  Survived ~ .,
+  data = tt_full_train_p,
+  degree = 1,
+  glm = list(family = binomial)
+)
+
+final_mars2_titanic <- earth(
+  Survived ~ .,
+  data = tt_full_train_p,
+  degree = 2,
+  glm = list(family = binomial)
+)
+
+pred_test_tree <- predict(final_tree_titanic, newdata = tt_test_p, type = "class")
+pred_test_bag <- predict(final_bag_titanic, newdata = tt_test_p)
+pred_test_rf <- predict(final_rf_titanic, newdata = tt_test_p)
+
+prob_test_mars1 <- predict(final_mars1_titanic, newdata = tt_test_p, type = "response")
+pred_test_mars1 <- factor(ifelse(prob_test_mars1 > 0.5, "Yes", "No"), levels = levels(tt_full_train_p$Survived))
+
+prob_test_mars2 <- predict(final_mars2_titanic, newdata = tt_test_p, type = "response")
+pred_test_mars2 <- factor(ifelse(prob_test_mars2 > 0.5, "Yes", "No"), levels = levels(tt_full_train_p$Survived))
+
+predykcje_titanic_test <- data.frame(
+  PassengerId = titanic_test$PassengerId,
+  Drzewo = pred_test_tree,
+  Bagging = pred_test_bag,
+  Las_losowy = pred_test_rf,
+  MARS_degree_1 = pred_test_mars1,
+  MARS_degree_2 = pred_test_mars2
+)
+
+head(predykcje_titanic_test)
+```
+
+Jeżeli lokalna wersja `titanic_test` ma kolumnę `Survived`, można policzyć błąd testowy:
+
+```{r zad4-titanic-test-jezeli-sa-etykiety}
+if ("Survived" %in% names(titanic_test)) {
+  y_test <- factor(titanic_test$Survived, levels = c(0, 1), labels = c("No", "Yes"))
+
+  wyniki_titanic_test <- data.frame(
+    Zbior = "Titanic -- titanic_test",
+    Model = c(
+      "Drzewo decyzyjne",
+      "Bagging",
+      "Las losowy",
+      "MARS degree = 1",
+      "MARS degree = 2"
+    ),
+    Blad_testowy = c(
+      class_error(y_test, pred_test_tree),
+      class_error(y_test, pred_test_bag),
+      class_error(y_test, pred_test_rf),
+      class_error(y_test, pred_test_mars1),
+      class_error(y_test, pred_test_mars2)
+    )
+  )
+
+  pokaz_wyniki(wyniki_titanic_test)
+} else {
+  cat("titanic_test nie zawiera kolumny Survived, więc nie da się policzyć błędu testowego.\n")
+  cat("Do porównania jakości modeli użyj tabeli wyniki_titanic_valid.\n")
+}
+```
+
+Ważność predyktorów dla Titanica:
+
+```{r zad4-titanic-waznosc}
+tree_titanic$variable.importance
+importance(bag_titanic)
+importance(rf_titanic)
+evimp(mars1_titanic)
+evimp(mars2_titanic)
+```
+
+## Łączne porównanie z zadania 4
+
+```{r zad4-laczne-porownanie}
+wyniki_hitters
+wyniki_titanic_valid
+```
+
+Krótki komentarz do wyników:
+
+```{r komentarz-koncowy, eval=FALSE}
+# W zadaniach regresyjnych porównujemy MSE: im mniejsza wartość, tym lepiej.
+# W zadaniach klasyfikacyjnych porównujemy odsetek błędnych klasyfikacji:
+# im mniejsza wartość, tym lepiej.
+#
+# Bagging i las losowy zwykle poprawiają jakość względem pojedynczego drzewa,
+# ponieważ uśredniają wiele drzew i zmniejszają wariancję modelu.
+#
+# Las losowy może być lepszy od baggingu, ponieważ przy każdym podziale losuje
+# podzbiór predyktorów, co zmniejsza korelację między drzewami.
+#
+# MARS degree = 1 modeluje nieliniowości addytywne.
+# MARS degree = 2 dodatkowo dopuszcza interakcje par predyktorów,
+# więc może poprawić wynik, ale może też łatwiej dopasować się zbyt mocno
+# do danych uczących.
+```

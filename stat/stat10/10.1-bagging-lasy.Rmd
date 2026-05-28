@@ -1,0 +1,267 @@
+---
+title: "Bagging i lasy losowe"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Otwarta implementacja lasów losowych --- i baggingu jako przypadku szczególnego
+--- dostępna jest w pakiecie `randomForest`.
+
+```{r}
+library(randomForest)
+```
+
+### Regresja
+
+Analizujemy zależność mediany ceny od pozostałych zmiennych w zbiorze danych
+`MASS::Boston`.
+
+```{r}
+library(MASS)
+head(Boston)
+```
+
+Las losowy z domyślną liczbą podziałów (dla regresji $\sqrt{p}$). Ustawienie 
+parametru `importance` na  `TRUE` wyznacza w trakcie uczenia dodatkową miarę 
+ważności predyktorów.
+
+```{r}
+medv_rf <- randomForest(medv ~ ., data = Boston, importance = TRUE)
+medv_rf
+```
+
+Wykres błędu OOB względem liczby drzew
+
+```{r}
+plot(medv_rf, type = "l")
+```
+
+W przypadku regresji błąd MSE OOB dostępny jest w składowej `mse` obiektu
+klasy `randomForest`.
+
+```{r}
+tail(medv_rf$mse)
+```
+
+Składowa `rsq` zawiera wartość pseudo-$R^2$ obliczaną ze wzoru
+
+$$
+  1 - \frac{MSE_{OOB}}{Var(Y)}
+$$
+
+```{r}
+plot(medv_rf$rsq, type = "l", xlab = "trees", ylab = expression(R^2))
+```
+
+Ważność predyktorów (kolumna `%IncMSE` zawiera wartości dodatkowej miary 
+ważności, o której była mowa wcześniej).
+
+```{r}
+importance(medv_rf)
+```
+
+Powyższa macierz w formie obrazkowej.
+
+```{r}
+varImpPlot(medv_rf)
+```
+
+Wykres częściowej zależności od najważniejszych predyktorów.
+
+```{r}
+partialPlot(medv_rf, Boston, x.var = rm)
+```
+
+```{r}
+partialPlot(medv_rf, Boston, x.var = lstat)
+```
+
+Funkcja `partialPlot()` z pakietu `randomForest` umożliwia wykonanie wykresów
+częściowej zależności tylko od jednego predyktora. Jeśli chcemy zobaczyć
+interakcje 2 predyktorów możemy użyć pakietu `plotmo`.
+
+```{r}
+library(plotmo)
+plotmo(medv_rf, pmethod = "partdep", degree1 = FALSE, degree2 = c("rm", "lstat"))
+```
+
+Dla porównania model baggingowy.
+
+```{r}
+medv_bag <- randomForest(medv ~ ., data = Boston, mtry = 13, importance = TRUE)
+medv_bag
+```
+
+Możemy też poszukać optymalnej wartości liczby podziałów.
+
+```{r}
+tune_res <- tuneRF(Boston[, -14], Boston[, 14], mtryStart = 2, stepFactor = 2)
+tune_res
+```
+
+Jeśli wyznaczona wartość optymalna jest różna od domyślnej i maksymalnej, 
+dopasowujemy model z tą liczbą podziałów.
+
+```{r}
+medv_rf_tuned <- NULL
+row_min <- which.min(tune_res[, "OOBError"])
+mtry_min <- tune_res[row_min, "mtry"]
+
+if (!(mtry_min %in% c(medv_rf$mtry, 13))) {
+  medv_rf_tuned <- randomForest(medv ~ ., data = Boston, mtry = mtry_min)
+  medv_rf_tuned
+} else if (mtry_min == medv_rf$mtry) {
+  "Równa domyślnej"
+} else {
+  "Równa maksymalnej"
+}
+```
+
+Porównanie błędu OOB.
+
+```{r}
+cols <- c("red", "black", "green")
+
+plot(medv_rf, type = "l", col = cols[1], main = NULL)
+lines(medv_bag$mse, col = cols[2])
+lgd <- c("rf", "bag")
+
+if (!is.null(medv_rf_tuned)) {
+  lines(medv_rf_tuned$mse, col = cols[3])
+  lgd <- c(lgd, "rf_tuned")
+}
+legend("topright", legend = lgd, col = cols, pch = 20)
+```
+
+Oszacowanie błędu testowego przy pomocy zbioru walidacyjnego.
+
+```{r}
+set.seed(2025)
+n <- nrow(Boston)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+medv_rf_subset <- randomForest(medv ~ ., data = Boston, subset = train)
+medv_rf_subset_pred <- predict(medv_rf_subset, Boston[test,])
+mean((medv_rf_subset_pred - Boston$medv[test])^2)
+
+medv_bag_subset <- randomForest(medv ~ ., data = Boston, subset = train, mtry = 13)
+medv_bag_subset_pred <- predict(medv_bag_subset, Boston[test,])
+mean((medv_bag_subset_pred - Boston$medv[test])^2)
+
+if (!is.null(medv_rf_tuned)) {
+  medv_tuned_subset <- randomForest(medv ~ ., data = Boston, subset = train, mtry = mtry_min)
+  medv_tuned_subset_pred <- predict(medv_tuned_subset, Boston[test,])
+  mean((medv_tuned_subset_pred - Boston$medv[test])^2)
+}
+```
+
+### Klasyfikacja
+
+Podobnie jak dla drzew decyzyjnych wykorzystujemy przekształcony zbiór danych 
+`ISLR::Carseats`.
+
+```{r}
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+head(CarseatsH)
+```
+
+Las losowy z domyślną liczbą podziałów (dla klasyfikacji $p / 3$).
+
+```{r}
+csh_rf <- randomForest(High ~ . - Sales, data = CarseatsH, importance = TRUE)
+csh_rf
+```
+
+Wykres błędu OOB względem liczby drzew. Tym razem mamy 3 krzywe błędu:
+
+- czarna - dla ogólnej proporcji błędnych klasyfikacji,
+
+- zielona - dla klasy `Yes`,
+
+- czerwona - dla klasy `No`.
+
+```{r}
+plot(csh_rf, type = "l")
+```
+
+W przypadku klasyfikacji wyniki analizy danych OOB dostępne są w składowych 
+`err.rate` (proporcja błędów) i `confusion` (tabela pomyłek wyznaczona na 
+podstawie danych OOB).
+
+```{r}
+tail(csh_rf$err.rate)
+csh_rf$confusion
+```
+
+Ważność predyktorów (dane z pierwszych 3 kolumn są dostępne dzięki ustawieniu
+`importance = TRUE`).
+
+```{r}
+importance(csh_rf)
+```
+
+Powyższa macierz w formie obrazkowej.
+
+```{r}
+varImpPlot(csh_rf)
+```
+
+Wykres częściowej zależności od najważniejszych predyktorów.
+
+```{r}
+partialPlot(csh_rf, CarseatsH, x.var = ShelveLoc, which.class = "Yes")
+```
+
+```{r}
+partialPlot(csh_rf, CarseatsH, x.var = Price, which.class = "Yes")
+```
+
+```{r}
+partialPlot(csh_rf, CarseatsH, x.var = Advertising, which.class = "Yes")
+```
+
+PDP z interakcjami
+
+```{r, warning=FALSE}
+plotmo(csh_rf, pmethod = "partdep", degree2 = c("^Price", "Advertising"))
+```
+
+Dla porównania model baggingowy.
+
+```{r}
+csh_bag <- randomForest(High ~ . - Sales, data = CarseatsH, mtry = 10, importance = TRUE)
+csh_bag
+```
+
+Porównanie proporcji błędów OOB
+
+```{r}
+cols = c("red", "blue")
+plot(csh_rf$err.rate[, "OOB"], type = "l", col = cols[1], xlab = "trees", ylab = "OOB error")
+lines(csh_bag$err.rate[, "OOB"], type = "l", col = cols[2])
+legend("topright", legend = c("rf", "bag"), col = cols, pch = 20)
+```
+
+Metodą zbioru walidacyjnego estymujemy błąd testowy.
+
+```{r}
+set.seed(1)
+n <- nrow(CarseatsH)
+train <- sample(n, 0.8 * n)
+test <- -train
+
+csh_rf_subset <- randomForest(High ~ . - Sales, data = CarseatsH, subset = train)
+csh_rf_subset_pred <- predict(csh_rf_subset, CarseatsH[test, ])
+mean(csh_rf_subset_pred != CarseatsH$High[test])
+
+csh_bag_subset <- randomForest(High ~ . - Sales, data = CarseatsH, subset = train, mtry = 10)
+csh_bag_subset_pred <- predict(csh_bag_subset, CarseatsH[test, ])
+mean(csh_bag_subset_pred != CarseatsH$High[test])
+```

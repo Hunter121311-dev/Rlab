@@ -1,0 +1,8 @@
+"element","wartosc"
+"targety_regresyjne",2
+"targety_klasyfikacyjne",2
+"modele_zespolowe_na_target",2
+"liczba_lasow_lacznie",8
+"liczba_drzew_na_las",500
+"liczba_drzew_lacznie",4000
+"liczba_watkow_ranger",14

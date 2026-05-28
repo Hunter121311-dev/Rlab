@@ -1,0 +1,363 @@
+import os
+import re
+import time
+import textwrap
+import traceback
+import importlib.util
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def rastrigin(x: np.ndarray) -> float:
+    A = 10
+    D = len(x)
+    return A * D + np.sum(x**2 - A * np.cos(2 * np.pi * x))
+
+
+def build_m2_prompt(parent_code: str) -> str:
+    return f"""
+I have one metaheuristic algorithm with its code as follows.
+
+```python
+{parent_code}
+```
+
+Please identify the main algorithm parameters and assist me in creating a new algorithm that has different parameter settings.
+
+Do not design a completely new algorithm. Keep the same general structure, but modify the parameter values in a meaningful way to change the exploration-exploitation behaviour.
+
+Write a Python function that implements your modified algorithm.
+
+The function must take exactly these arguments:
+- function: Callable[[np.ndarray], float] - the objective function to minimise.
+- bounds: list[tuple[float, float]] - a list of (lower, upper) pairs delimiting the search space for each dimension.
+- budget: int - the total number of objective-function evaluations the algorithm may perform.
+
+The function should return a tuple[float, np.ndarray] containing the best objective value found and the corresponding decision vector.
+
+Your solution should be wrapped in a Markdown Python code block and must define a function named new_metaheuristic.
+
+Use this exact function signature:
+
+```python
+import numpy as np
+from typing import Callable
+
+def new_metaheuristic(
+    function: Callable[[np.ndarray], float],
+    bounds: list[tuple[float, float]],
+    budget: int
+) -> tuple[float, np.ndarray]:
+    ...
+```
+
+Do not give additional explanations.
+"""
+
+
+def extract_python_code(response: str) -> str:
+    pattern = r"```python\s*(.*?)```"
+    match = re.search(pattern, response, re.DOTALL)
+
+    if match:
+        return match.group(1).strip()
+
+    return response.strip()
+
+
+def save_solution(code: str, output_dir: str, epoch: int) -> Path:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    file_path = output_path / f"heuristic_epoch_{epoch:02d}.py"
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(code)
+
+    return file_path
+
+
+def load_heuristic_from_file(file_path: Path) -> Callable:
+    module_name = file_path.stem
+
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+
+    spec.loader.exec_module(module)
+
+    if not hasattr(module, "new_metaheuristic"):
+        raise ValueError(f"{file_path} does not define new_metaheuristic")
+
+    return module.new_metaheuristic
+
+
+class BudgetedObjective:
+    def __init__(self, objective: Callable[[np.ndarray], float], budget: int):
+        self.objective = objective
+        self.budget = budget
+        self.evaluations = 0
+
+    def __call__(self, x: np.ndarray) -> float:
+        self.evaluations += 1
+
+        if self.evaluations > self.budget:
+            raise RuntimeError("The algorithm exceeded the evaluation budget.")
+
+        return self.objective(x)
+
+
+def verify_heuristic(
+    heuristic: Callable,
+    objective: Callable[[np.ndarray], float] = rastrigin,
+    dimension: int = 10,
+    budget: int = 10_000,
+    seeds: range = range(10),
+) -> dict:
+
+    bounds = [(-5.12, 5.12)] * dimension
+
+    best_values = []
+    times = []
+    eval_counts = []
+
+    for seed in seeds:
+        np.random.seed(seed)
+
+        tracked_objective = BudgetedObjective(objective, budget)
+
+        start_time = time.time()
+
+        best_value, best_solution = heuristic(
+            function=tracked_objective,
+            bounds=bounds,
+            budget=budget,
+        )
+
+        elapsed = time.time() - start_time
+
+        best_values.append(best_value)
+        times.append(elapsed)
+        eval_counts.append(tracked_objective.evaluations)
+
+    return {
+        "mean_best_fitness": float(np.mean(best_values)),
+        "std_best_fitness": float(np.std(best_values)),
+        "min_best_fitness": float(np.min(best_values)),
+        "max_best_fitness": float(np.max(best_values)),
+        "mean_time_sec": float(np.mean(times)),
+        "mean_evaluations": float(np.mean(eval_counts)),
+    }
+
+
+def analyse_design_patterns(code: str) -> dict:
+    patterns = {
+        "differential_mutation": r"\w+\s*\+\s*.*\*\s*\(.*-.*\)",
+        "crossover": r"CR|crossover|j_rand",
+        "gaussian_mutation": r"normal|gauss|Gaussian",
+        "levy_mutation": r"levy|Levy|Lévy",
+        "adaptive_parameters": r"adaptive|success|failure|delta|update",
+        "population_based": r"population|individual|agent",
+        "elitism": r"elite|best",
+        "restart": r"restart|reinitialize|stagnation",
+        "boundary_clipping": r"clip|bounds",
+        "local_search": r"local|perturb|neighbour|neighbor",
+    }
+
+    result = {}
+
+    for name, pattern in patterns.items():
+        result[name] = bool(re.search(pattern, code, re.IGNORECASE))
+
+    return result
+
+
+def run_simple_eoh_m2(
+    initial_code: str,
+    llm_generate: Callable[[str], str],
+    output_dir: str = "generated_heuristics",
+    epochs: int = 10,
+    dimension: int = 10,
+    budget: int = 10_000,
+    seeds: range = range(10),
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+    current_population = []
+
+    initial_code = textwrap.dedent(initial_code).strip()
+    initial_file = save_solution(initial_code, output_dir, epoch=0)
+
+    current_population.append({
+        "epoch": 0,
+        "code": initial_code,
+        "file": initial_file,
+    })
+
+    all_results = []
+
+    for epoch in range(epochs + 1):
+        print(f"\n=== Epoch {epoch} ===")
+
+        current_code = current_population[-1]["code"]
+        current_file = current_population[-1]["file"]
+
+        try:
+            heuristic = load_heuristic_from_file(current_file)
+
+            metrics = verify_heuristic(
+                heuristic=heuristic,
+                objective=rastrigin,
+                dimension=dimension,
+                budget=budget,
+                seeds=seeds,
+            )
+
+            patterns = analyse_design_patterns(current_code)
+
+            row = {
+                "epoch": epoch,
+                "file": str(current_file),
+                "valid": True,
+                **metrics,
+                **patterns,
+            }
+
+        except Exception as e:
+            row = {
+                "epoch": epoch,
+                "file": str(current_file),
+                "valid": False,
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            }
+
+        all_results.append(row)
+
+        if epoch == epochs:
+            break
+
+        parent = current_population[-1]
+        prompt = build_m2_prompt(parent["code"])
+
+        response = llm_generate(prompt)
+        child_code = extract_python_code(response)
+
+        child_file = save_solution(child_code, output_dir, epoch=epoch + 1)
+
+        current_population.append({
+            "epoch": epoch + 1,
+            "code": child_code,
+            "file": child_file,
+        })
+
+    results_df = pd.DataFrame(all_results)
+
+    pattern_columns = [
+        "differential_mutation",
+        "crossover",
+        "gaussian_mutation",
+        "levy_mutation",
+        "adaptive_parameters",
+        "population_based",
+        "elitism",
+        "restart",
+        "boundary_clipping",
+        "local_search",
+    ]
+
+    existing_pattern_columns = [
+        col for col in pattern_columns if col in results_df.columns
+    ]
+
+    pattern_summary_df = (
+        results_df[existing_pattern_columns]
+        .fillna(False)
+        .mean()
+        .sort_values(ascending=False)
+        .reset_index()
+    )
+
+    pattern_summary_df.columns = ["design_pattern", "frequency"]
+
+    return results_df, pattern_summary_df
+
+
+def plot_eoh_quality(results_df: pd.DataFrame):
+    valid_df = results_df[results_df["valid"] == True].copy()
+
+    plt.figure(figsize=(9, 5))
+    plt.plot(
+        valid_df["epoch"],
+        valid_df["mean_best_fitness"],
+        marker="o",
+    )
+    plt.xlabel("Epoch")
+    plt.ylabel("Mean best fitness")
+    plt.title("Evolution of Heuristics: solution quality across epochs")
+    plt.grid(True)
+    plt.show()
+
+
+def plot_eoh_time(results_df: pd.DataFrame):
+    valid_df = results_df[results_df["valid"] == True].copy()
+
+    plt.figure(figsize=(9, 5))
+    plt.plot(
+        valid_df["epoch"],
+        valid_df["mean_time_sec"],
+        marker="o",
+    )
+    plt.xlabel("Epoch")
+    plt.ylabel("Mean optimisation time [s]")
+    plt.title("Evolution of Heuristics: optimisation time across epochs")
+    plt.grid(True)
+    plt.show()
+
+
+def plot_pattern_frequencies(pattern_summary_df: pd.DataFrame):
+    plt.figure(figsize=(10, 5))
+    plt.bar(
+        pattern_summary_df["design_pattern"],
+        pattern_summary_df["frequency"],
+    )
+    plt.xlabel("Design pattern")
+    plt.ylabel("Frequency")
+    plt.title("Most common design patterns in generated heuristics")
+    plt.xticks(rotation=45, ha="right")
+    plt.grid(True)
+    plt.show()
+
+
+# ============================================================
+# Example usage
+# ============================================================
+
+with open("Wklejony kod(4).py", "r", encoding="utf-8") as f:
+    initial_code = f.read()
+
+
+def llm_generate(prompt: str) -> str:
+    raise NotImplementedError("Connect this function to your LLM API or paste generated response here.")
+
+
+# Odkomentuj po podłączeniu llm_generate.
+#
+# results_df, pattern_summary_df = run_simple_eoh_m2(
+#     initial_code=initial_code,
+#     llm_generate=llm_generate,
+#     output_dir="generated_heuristics",
+#     epochs=10,
+#     dimension=10,
+#     budget=10_000,
+#     seeds=range(10),
+# )
+#
+# display(results_df)
+# display(pattern_summary_df)
+#
+# plot_eoh_quality(results_df)
+# plot_eoh_time(results_df)
+# plot_pattern_frequencies(pattern_summary_df)

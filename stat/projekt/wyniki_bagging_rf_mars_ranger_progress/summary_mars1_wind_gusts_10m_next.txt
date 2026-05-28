@@ -1,0 +1,18 @@
+Call: earth(x=as.matrix(x_train), y=y_train, degree=degree, nk=mars_nk)
+
+                           coefficients
+(Intercept)                  19.2559944
+h(10.7-wind_speed_10m)       -0.4331398
+h(wind_speed_10m-10.7)        0.7040892
+h(19.1-wind_gusts_10m)       -0.6359618
+h(wind_gusts_10m-19.1)        0.5708727
+h(274-shortwave_radiation)   -0.0037043
+h(shortwave_radiation-274)    0.0038879
+h(-0.5-sin_godzina)          -1.1064367
+h(sin_godzina- -0.5)          0.7451952
+
+Selected 9 of 9 terms, and 4 of 19 predictors
+Termination condition: RSq changed by less than 0.001 at 9 terms
+Importance: wind_gusts_10m, wind_speed_10m, shortwave_radiation, sin_godzina, wind_speed_100m-unused, wind_dir_sin-unused, wind_dir_cos-unused, ...
+Number of terms at each degree of interaction: 1 8 (additive model)
+GCV 6.158883    RSS 1411401    GRSq 0.9696653    RSq 0.9696695
