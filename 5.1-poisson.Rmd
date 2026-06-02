@@ -1,0 +1,115 @@
+---
+title: "Regresja Poissonowska"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Regresja Poissonowska
+
+Używamy zbioru danych `DebTrivedi` (dostępnego np. w pakiecie `MixAll`) 
+prezentującego zapotrzebowanie na usługi
+medyczne. Opis większości zmiennych można znaleźć na
+[tej stronie](https://www.rdocumentation.org/packages/RAZIAD/versions/0.0.1/topics/DebTrivedi)
+
+```{r}
+library(MixAll) |> suppressPackageStartupMessages()
+data(DebTrivedi)
+head(DebTrivedi)
+```
+
+Jako zmienną objaśnianą wybieramy `ofp` i usuwamy pozostałe powiązane zmienne.
+
+```{r}
+dt <- DebTrivedi[-(2:5)]
+head(dt)
+```
+
+Badamy wpływ predyktorów na liczbę wizyt u lekarza.
+
+Przykładowe wykresy zależności pojedynczych zmiennych.
+
+```{r}
+plot(ofp ~ numchron, data = dt)
+```
+
+Albo lepiej
+
+```{r}
+plot(log(ofp + 0.5) ~ cut(numchron, breaks = unique(quantile(numchron, 0:4/4))), data = dt)
+```
+
+```{r}
+plot(log(ofp + 0.5) ~ health, data = dt)
+```
+
+Wykres zwany spinogramem.
+
+```{r}
+plot(cut(ofp, breaks = c(0:2, 4, 6, 10, 100)) ~ school, data = dt, breaks = 9)
+```
+
+Budujemy pełny model regresji Poissonowskiej.
+
+```{r}
+dt_fit <- glm(ofp ~ ., data = dt, family = poisson)
+summary(dt_fit)
+```
+
+
+### Model z napompowanymi zerami
+
+W zbiorze danych jest znacząca liczba wierszy, dla których `ofp == 0`.
+
+```{r}
+plot(table(dt$ofp))
+```
+
+Utrudnia to modelowanie przy pomocy rozkładu Poissona, w którym typowo
+prawdopodobieństwo wartości 0 jest niskie. W związku z tym używa się
+modeli rozbudowanych, które *pompują* prawdopodobieństwo zera. Jednym
+z takich modeli jest **model Poissonowski z napompowanym zerem**
+[*Zero-Inflated Poisson, ZIP*]. Jest to model miksturowy, w którym
+funkcja prawdopodobieństwa (warunkowa) zmiennej odpowiedzi ma postać
+$$
+\begin{aligned}
+  P(Y = 0) & = \pi_0 + (1 - \pi_0) e^{-\lambda}, & \\
+  P(Y = k) & = (1 - \pi_0) \, e^{-\lambda} \frac{\lambda^k}{k!},
+  & k = 1, 2, \dots
+\end{aligned}
+$$
+Nie jest to GLM i wymaga nieco bardziej skomplikowanego treningu. Implementacja
+modelu ZIP jest dostępna np. w pakiecie `pscl`.
+
+```{r}
+library(pscl) |> suppressPackageStartupMessages()
+dt_zip0_fit <- zeroinfl(ofp ~ ., data = dt)
+summary(dt_zip0_fit)
+```
+
+Nie wszystkie predyktory okazały się istotne zarówno przy modelowaniu
+części Poissonowskiej, jak i w modelowaniu $\pi_0$, stosujemy więc model
+zredukowany
+
+```{r}
+dt_zip_fit <- zeroinfl(ofp ~ . - black - gender - faminc | 
+                         hosp + numchron + gender + school + privins + medicaid,
+                       data = dt)
+summary(dt_zip_fit)
+```
+
+Porównanie modeli
+
+```{r}
+data.frame(
+  model = c("Poisson", "ZIP full", "ZIP"),
+  logLik = vapply(list(dt_fit, dt_zip0_fit, dt_zip_fit), logLik, FUN.VALUE = double(1)),
+  AIC = vapply(list(dt_fit, dt_zip0_fit, dt_zip_fit), AIC, FUN.VALUE = double(1))
+)
+```
+
+### Zadanie
+
+Powtórz powyższe analizy dla zbioru danych `PhdPubs` z pakietu `vcdExtra`.

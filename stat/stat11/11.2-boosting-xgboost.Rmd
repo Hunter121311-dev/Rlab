@@ -1,0 +1,205 @@
+---
+title: "Boosting - XGBoost"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+```
+
+## XGBoost
+
+Instalujemy aktualną wersję pakietu z repozytorium 
+[RUniverse](https://dmlc.r-universe.dev).
+
+```{r, eval=FALSE}
+install.packages("xgboost", repos = c("https://dmlc.r-universe.dev", "https://cloud.r-project.org"))
+```
+
+### Regresja
+
+Zadanie jak poprzednio. Dopasowujemy model z domyślnymi ustawieniami. 
+Niestety pakiet nie zawiera API dla formuł. Ustawienie `monitor_training` na 
+`TRUE` udostępnia wartości błędu treningowego.
+
+```{r}
+library(xgboost)
+medv_xgb <- xgboost(Boston[-14], Boston$medv, monitor_training = TRUE)
+medv_xgb
+```
+
+Wykres błędu treningowego - model regresyjny domyślnie posługuje się wartością
+RMSE. Tutaj przekształcamy ją do MSE dla porównania z GBM3.
+
+```{r}
+attr(medv_xgb, "evaluation_log")$train_rmse^2 |>
+  plot(type = "l", xlab = "Tree", ylab = "MSE")
+```
+
+Ważność predyktorów
+
+```{r}
+xgb.importance(medv_xgb)
+```
+
+Wykres ważności predyktorów
+
+```{r}
+xgb.importance(medv_xgb) |> xgb.plot.importance()
+```
+
+Wykonanie wykresu częściowej zależności jest możliwe przy pomocy pakietu `pdp` 
+(pakiet `plotmo` w tym wypadku nie działa).
+
+```{r, eval=FALSE}
+install.packages("pdp")
+```
+
+Wykres częściowej zależności od jednego predyktora.
+
+```{r}
+library(pdp)
+partial(medv_xgb, pred.var = "lstat", train = Boston, type = "regression") |> 
+  plotPartial()
+```
+
+Wykres częściowej zależności dla 2 predyktorów.
+
+```{r}
+partial(medv_xgb, pred.var = c("lstat", "rm"), train = Boston, type = "regression", chull = TRUE) |> 
+  plotPartial()
+```
+
+Biblioteka XGBoost umożliwia wykonanie dodatkowych wykresów.
+
+Wykres diagnostyczny obrazujący złożoność modelu wyrażoną jako rozmieszczenie
+liści poszczególnych drzew na różnych poziomach interakcji.
+
+```{r}
+xgb.plot.deepness(medv_xgb)
+```
+
+Można też zobaczyć struktury wszystkich drzew w modelu: kolumny `Yes`, `No`
+i `Missing` zawierają identyfikator następnego węzła w danej gałęzi.
+
+```{r}
+xgb.model.dt.tree(medv_xgb)
+```
+
+Można też zobrazować rodzaj drzewa sumarycznego. Wymagany jest pakiet `DiagrammeR`.
+
+```{r eval=FALSE}
+install.packages("DiagrammeR")
+```
+
+
+Obrazek jest zwykle bardzo duży,
+sensowne może być zachowanie go w pliku i oglądanie oddzielnie.
+
+
+```{r, eval=FALSE}
+library(DiagrammeR)
+medv_plot <- xgb.plot.multi.trees(medv_xgb, render = FALSE)
+export_graph(medv_plot, file_name = "medv_xgb.pdf")
+```
+
+Możemy oczywiście dostosować parametry metody manipulując wartościami
+parametrów funkcji `xgboost()`. Wśród nich są:
+
+- `nrounds` - liczba drzew w zespole (parametr $M$), domyślnie 100,
+
+- `max_depth` - maksymalna głębokość drzewa (parametr $d - 1$), domyślnie 6,
+
+- `learning_rate` - parametr spowalniający uczenie ($\nu$), domyślnie 0.3,
+
+- `eval_set` - zbiór walidacyjny albo proporcja wielkości losowanego
+zbioru walidacyjnego,
+
+- `subsample` - ułamek faktycznego zbioru treningowego (bez `eval_set`) stosowany 
+w uczeniu pojedynczego drzewa (parametr $\eta$), domyślnie 1,
+
+- `objective` - parametr analogiczny do `distribution` w GBM3 i wyznaczający
+funkcję straty - funkcja dobiera sensowną wartość domyślną na podstawie typu
+zmiennej odpowiedzi (parametr `y`).
+
+Dopasowujemy model z większą liczbą drzew, mniejszą wartością parametru
+spowalniającego, z losowanym zbiorem walidacyjnym złożonym z 50% elementów
+zbioru danych i każde drzewo dopasowując do 50% pozostałego zbioru danych.
+
+```{r}
+medv_xgb_big <- xgboost(Boston[-14], Boston$medv, nrounds = 1000, learning_rate = 0.01,
+                        eval_set = 0.5, subsample = 0.5,
+                        verbosity = 0, monitor_training = TRUE)
+medv_xgb_big
+```
+
+Teraz mamy dostępny zarówno błąd treningowy, jak i walidacyjny.
+
+```{r}
+error <- attr(medv_xgb_big, "evaluation_log")
+plot(error$train_rmse^2, xlab = "Trees", ylab = "MSE", type = "l")
+lines(error$eval_rmse^2, col = "red")
+legend("topright", legend = c("Treningowy", "Walidacyjny"), col = c("black", "red"), pch = 20)
+```
+
+### Klasyfikacja
+
+Zadanie jak poprzednio. Dopasowujemy model z domyślnymi wartościami parametrów.
+
+```{r}
+csh_xgb <- xgboost(CarseatsH[-c(1, 12)], CarseatsH$High, monitor_training = TRUE)
+csh_xgb
+```
+
+Wykres błędu treningowego (tutaj: ujemna wiarygodność logarytmiczna).
+
+```{r}
+attr(csh_xgb, "evaluation_log")$train_logloss |>
+  plot(type = "l", xlab = "Tree", ylab = "-log likelihood")
+```
+
+Ważność predyktorów
+
+```{r}
+xgb.importance(csh_xgb)
+```
+
+i obrazek
+
+```{r}
+xgb.plot.importance(xgb.importance(csh_xgb))
+```
+
+Wykres częściowej zależności od 1 predyktora (`type = "classification"` nie działa!).
+
+```{r}
+partial(csh_xgb, pred.var = "Price", train = CarseatsH, type = "regression") |> 
+  plotPartial()
+```
+
+Od 2 predyktorów.
+
+```{r}
+partial(csh_xgb, pred.var = c("Price", "CompPrice"), train = CarseatsH, 
+        type = "regression", chull = TRUE) |> 
+  plotPartial()
+```
+
+Tabela pomyłek dla zbioru treningowego.
+
+```{r}
+probs <- predict(csh_xgb, CarseatsH)
+predicted <- ifelse(probs > 0.5, "Yes", "No")
+table(predicted, CarseatsH$High)
+```
+
+Treningowa proporcja błędów
+
+```{r}
+mean(predicted != CarseatsH$High)
+```

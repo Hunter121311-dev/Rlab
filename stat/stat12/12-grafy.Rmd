@@ -1,0 +1,307 @@
+---
+title: "Modele graficzne"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Skierowane modele graficzne (sieci bayesowskie, DGM)
+
+### Uczenie DGM
+
+Uczenie DGM zaimplementowane jest w pakiecie `bnlearn`.
+
+```{r}
+library(bnlearn)
+```
+
+Używamy zbioru danych o pasażerach Titanica dostępnego w standardowym pakiecie
+`datasets`.
+
+```{r}
+titanic_df <- as.data.frame(Titanic)
+titanic_df <- titanic_df[rep(1:nrow(titanic_df), titanic_df$Freq), 1:4]
+row.names(titanic_df) <- NULL
+titanic_df |> head()
+```
+
+Przeprowadzamy uczenie struktury sieci przy pomocy jednego z dostępnych
+w pakiecie `bnlearn` --- *Hill Climbing*.
+
+```{r}
+titanic_dag <- hc(titanic_df)
+titanic_dag
+```
+
+Obrazek ze strukturą DAG
+
+```{r}
+plot(titanic_dag)
+```
+
+Trenujemy parametry sieci (CPT) przy pomocy MLE.
+
+```{r}
+titanic_bn <- bn.fit(titanic_dag, data = titanic_df)
+titanic_bn
+```
+
+Można zobaczyć CPT tylko dla pojedynczego węzła.
+
+```{r}
+titanic_bn$Age
+```
+
+Rozkłady warunkowe poszczególnych węzłów można pokazać na rysunku.
+
+```{r}
+bn.fit.barchart(titanic_bn$Age)
+```
+
+Inny rodzaj wykresu pokazującego to samo.
+
+```{r}
+bn.fit.dotplot(titanic_bn$Survived)
+```
+
+### Wnioskowanie w DGM
+
+Pakiet `bnlearn` implementuje 2 algorytmy wnioskowania **przybliżonego**. Domyślnym
+jest *Logic Sampling*.
+
+Wyznaczamy prawdopodobieństwo przeżycia dla dorosłej kobiety.
+
+```{r}
+cpquery(titanic_bn, event = (Survived == "Yes"), evidence = (Sex == "Female" & Age == "Adult"))
+```
+
+Prawdopodobieństwo bycia członkiem załogi jeśli się przeżyło katastrofę.
+
+```{r}
+cpquery(titanic_bn, event = (Class == "Crew"), evidence = (Survived == "Yes"))
+```
+
+Sieć bayesowska reprezentuje rozkład prawdopodobieństwa --- możemy próbkować
+przy pomocy tego rozkładu.
+
+```{r}
+rbn(titanic_bn, 5)
+```
+
+### NBC i TAN
+
+Szczególnymi sieciami bayesowskimi są naiwne klasyfikatory bayesowskie (NBC)
+i naiwne klasyfikatory bayesowskie zasilone drzewami (TAN).
+
+Dopasowujemy NBC.
+
+```{r}
+titanic_nbc <- naive.bayes(titanic_df, training = "Survived")
+titanic_nbc
+```
+
+Struktura NBC.
+
+```{r}
+plot(titanic_nbc)
+```
+
+Predykcja przy pomocy NBC.
+
+```{r, warning=FALSE}
+passenger <- data.frame(
+  Class = factor("2nd", levels = levels(titanic_df$Class)),
+  Sex = factor("Female", levels = c("Female", "Male")),
+  Age = factor("Adult", levels = c("Adult", "Child")),
+  Survived = factor("No", levels = c("No", "Yes"))
+)
+predict(titanic_nbc, data = passenger)
+```
+
+Tabela pomyłek dla zbioru trenigowego.
+
+```{r}
+predicted_nbc <- predict(titanic_nbc, titanic_df)
+table(predicted_nbc, titanic_df$Survived)
+```
+
+Treningowa proporcja błędów.
+
+```{r}
+mean(predicted_nbc != titanic_df$Survived)
+```
+
+Dla porównania dopasowujemy TAN.
+
+```{r}
+titanic_tan <- tree.bayes(titanic_df, training = "Survived")
+titanic_tan
+```
+
+Obrazek ze strukturą TAN.
+
+```{r}
+plot(titanic_tan)
+```
+
+Predykcja przy pomocy TAN.
+
+```{r, warning=FALSE}
+predict(titanic_tan, passenger)
+```
+
+Treningowa tabela pomyłek.
+
+```{r}
+predicted_tan <- predict(titanic_tan, titanic_df)
+table(predicted_tan, titanic_df$Survived)
+```
+
+Treningowa proporcja błędów.
+
+```{r}
+mean(predicted_tan != titanic_df$Survived)
+```
+
+### Gaussowski DGM
+
+`bnlearn` pozwala także uczyć Gaussowskie sieci bayesowskie (GBN).
+
+Dopasowujemy GBN do danych ze zbioru `Boston`. Musimy się pozbyć zmiennych
+całkowitoliczbowych `chas` i `rad`.
+
+```{r}
+library(MASS)
+Boston_cont <- Boston[-c(4, 9)]
+boston_cont_dag <- hc(Boston_cont)
+boston_cont_dag
+```
+
+Struktura sieci
+
+```{r}
+plot(boston_cont_dag)
+```
+
+Możemy sprawdzić czy `lstat` i `rm` są d-oddzielone przez `medv`, czyli
+czy
+$$
+  lstat \perp rm \ | \ medv.
+$$
+
+```{r}
+dsep(boston_cont_dag, "lstat", "rm", "medv")
+```
+
+Uczymy model na danych.
+
+```{r}
+boston_cont_gbn <- bn.fit(boston_cont_dag, data = Boston_cont)
+boston_cont_gbn
+```
+
+Jak widać, jest to zespół powiązanych modeli liniowych.
+
+Dla GBN dostępne są wykresy podobne jak dla modelu liniowego. Wykres
+rezyduów względem wartości dopasowanych (*Residuals vs Fitted*).
+
+```{r}
+bn.fit.xyplot(boston_cont_gbn$rm)
+```
+
+Wykres kwantylowy
+
+```{r}
+bn.fit.qqplot(boston_cont_gbn$lstat)
+```
+
+Histogram rezyduów
+
+```{r}
+bn.fit.histogram(boston_cont_gbn$medv)
+```
+
+Predykcja modelu
+
+```{r}
+predict(boston_cont_gbn, "medv", data = Boston_cont[20, ], method = "exact")
+```
+
+MSE na zbiorze treningowym
+
+```{r}
+predicted_gbn <- predict(boston_cont_gbn, "medv", data = Boston_cont, method = "exact")
+mean((predicted_gbn - Boston_cont$medv)^2)
+```
+
+### Modele hybrydowe
+
+`bnlearn` pozwala także konstruować modele hybrydowe, tzn. takie, w których
+występują zarówno węzły z rozkładami normalnymi, jak i węzły z rozkładami
+dyskretnymi. Podstawowym ograniczeniem jest to, że węzeł z rozkładem dyskretnym 
+musi mieć rodziców z rozkładami dyskretnymi. Ponadto NBC i TAN dostępne są wyłącznie
+dla pełnych rozkładów dyskretnych.
+
+W modelu hybrydowym mogą występować tylko zmienne numeryczne (ale nie typu
+`integer`) i czynnikowe. Przekształcamy więc zbiór danych.
+
+```{r}
+Boston_all <- Boston
+Boston_all$chas <- factor(Boston_all$chas)
+Boston_all$rad <- factor(Boston_all$rad, ordered = TRUE)
+summary(Boston_all)
+```
+
+Przeprowadzamy uczenie struktury
+
+```{r}
+boston_all_dag <- hc(Boston_all)
+boston_all_dag
+```
+
+Struktura sieci
+
+```{r}
+plot(boston_all_dag)
+```
+
+Dopasowujemy model do danych
+
+```{r}
+boston_all_hybrid <- bn.fit(boston_all_dag, data = Boston_all)
+boston_all_hybrid
+```
+
+Ponieważ w sieci występują różne węzły, różnie też obrazuje się ich rozkłady
+warunkowe.
+
+Węzeł z rozkładem ciągłym i 1 rodzicem o rozkładzie dyskretnym
+
+```{r}
+bn.fit.histogram(boston_all_hybrid$medv)
+```
+
+Węzeł dyskretny
+
+```{r}
+bn.fit.dotplot(boston_all_hybrid$rad)
+```
+
+MSE na zbiorze treningowym
+
+```{r}
+predicted_hybrid <- predict(boston_all_hybrid, "medv", data = Boston_all, method = "bayes-lw")
+mean((predicted_hybrid - Boston_all$medv)^2)
+```
+
+### Zadania
+
+1. Dopasuj modele graficzne do zbiorów danych `Carseats` (lub `CarseatsH` bez
+`Sales`) i `Hitters`. Porównaj predykcję z predykcją innych modeli (np.
+modelu liniowego metody najmniejszych kwadratów).
+
+2. Zastosuj NBC i TAN do zadania klasyfikacji sprzedaży fotelików.
+Wszystkie zmienne muszą mieć rozkłady dyskretne, więc część zmiennych trzeba
+zdyskretyzować --- pomocna może być funkcja `bnlearn::discretize()`.

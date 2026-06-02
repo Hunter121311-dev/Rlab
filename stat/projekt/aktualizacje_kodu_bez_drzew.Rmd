@@ -1,0 +1,668 @@
+---
+title: "Aktualizacje kodu projektu - bez drzew decyzyjnych"
+output: html_document
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+# Ten plik zawiera brakujące aktualizacje kodu wskazane przy porównaniu projektu
+# z notatnikami. Drzewa decyzyjne celowo nie są tutaj zmieniane.
+
+packages <- c(
+  "dplyr", "lubridate", "leaps", "glmnet", "mgcv", "lme4", "pROC"
+)
+missing_packages <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_packages) > 0) {
+  stop(
+    "Brakuje pakietów: ", paste(missing_packages, collapse = ", "),
+    "\nZainstaluj je np. install.packages(c(",
+    paste(sprintf('"%s"', missing_packages), collapse = ", "), "))"
+  )
+}
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(lubridate)
+  library(leaps)
+  library(glmnet)
+  library(mgcv)
+  library(lme4)
+  library(pROC)
+})
+
+# Jeżeli w Twoim projekcie ramka danych ma inną nazwę, ustaw ją tutaj ręcznie,
+# np. weather_df <- meteo albo weather_df <- dane.
+if (!exists("weather_df")) {
+  candidate_names <- c("dane", "df", "weather", "weather_data", "meteo", "meteo_df", "data_meteo")
+  found <- candidate_names[vapply(candidate_names, exists, logical(1))]
+  if (length(found) == 0) {
+    stop("Nie znaleziono ramki danych. Utwórz obiekt weather_df albo zmień listę candidate_names.")
+  }
+  weather_df <- get(found[1])
+}
+```
+
+## Funkcje wspólne
+
+```{r funkcje-wspolne}
+prepare_weather_project <- function(df, cutoff = "2025-01-01") {
+  stopifnot("datetime" %in% names(df))
+
+  df <- df |>
+    mutate(
+      datetime = as.POSIXct(datetime),
+      date = as.Date(datetime),
+      rok = lubridate::year(datetime),
+      miesiac = factor(lubridate::month(datetime)),
+      dzien_roku = lubridate::yday(datetime),
+      godzina = lubridate::hour(datetime),
+      sin_dzien = sin(2 * pi * dzien_roku / 365),
+      cos_dzien = cos(2 * pi * dzien_roku / 365),
+      sin_godzina = sin(2 * pi * godzina / 24),
+      cos_godzina = cos(2 * pi * godzina / 24),
+      sezon = factor(ifelse(lubridate::month(datetime) %in% 4:9, "cieply", "chlodny"))
+    ) |>
+    arrange(datetime)
+
+  if ("wind_direction_10m" %in% names(df)) {
+    df <- df |>
+      mutate(
+        wind_dir_sin = sin(2 * pi * wind_direction_10m / 360),
+        wind_dir_cos = cos(2 * pi * wind_direction_10m / 360)
+      )
+  }
+
+  if ("wind_speed_10m" %in% names(df) && !"wind_speed_10m_next" %in% names(df)) {
+    df <- df |> mutate(wind_speed_10m_next = lead(wind_speed_10m))
+  }
+  if ("wind_gusts_10m" %in% names(df) && !"wind_gusts_10m_next" %in% names(df)) {
+    df <- df |> mutate(wind_gusts_10m_next = lead(wind_gusts_10m))
+  }
+  if ("is_day" %in% names(df) && !"is_day_next" %in% names(df)) {
+    df <- df |> mutate(is_day_next = lead(is_day))
+  }
+
+  df <- df |>
+    mutate(train_set = datetime < as.POSIXct(cutoff))
+
+  df
+}
+
+available_predictors <- function(df, extra = character()) {
+  base <- c(
+    "wind_speed_10m", "wind_speed_100m", "wind_gusts_10m",
+    "wind_dir_sin", "wind_dir_cos",
+    "temperature_2m", "relative_humidity_2m", "dew_point_2m",
+    "apparent_temperature", "precipitation", "cloud_cover",
+    "pressure_msl", "surface_pressure", "shortwave_radiation",
+    "sin_dzien", "cos_dzien", "sin_godzina", "cos_godzina",
+    "miesiac", "sezon"
+  )
+  intersect(c(base, extra), names(df))
+}
+
+align_model_matrix <- function(train_df, test_df, predictors) {
+  x_train <- model.matrix(reformulate(predictors), data = train_df)[, -1, drop = FALSE]
+  x_test <- model.matrix(reformulate(predictors), data = test_df)[, -1, drop = FALSE]
+
+  missing_cols <- setdiff(colnames(x_train), colnames(x_test))
+  for (cl in missing_cols) x_test <- cbind(x_test, setNames(data.frame(0), cl))
+
+  extra_cols <- setdiff(colnames(x_test), colnames(x_train))
+  if (length(extra_cols) > 0) x_test <- x_test[, setdiff(colnames(x_test), extra_cols), drop = FALSE]
+
+  x_test <- x_test[, colnames(x_train), drop = FALSE]
+  list(x_train = x_train, x_test = x_test)
+}
+
+regression_metrics <- function(y, pred) {
+  mse <- mean((y - pred)^2, na.rm = TRUE)
+  rmse <- sqrt(mse)
+  mae <- mean(abs(y - pred), na.rm = TRUE)
+  r2 <- 1 - sum((y - pred)^2, na.rm = TRUE) / sum((y - mean(y, na.rm = TRUE))^2, na.rm = TRUE)
+  data.frame(MSE = mse, RMSE = rmse, MAE = mae, R2 = r2)
+}
+
+classification_metrics <- function(y, prob, threshold = 0.5) {
+  y <- as.integer(y)
+  pred <- as.integer(prob >= threshold)
+  tp <- sum(pred == 1 & y == 1, na.rm = TRUE)
+  tn <- sum(pred == 0 & y == 0, na.rm = TRUE)
+  fp <- sum(pred == 1 & y == 0, na.rm = TRUE)
+  fn <- sum(pred == 0 & y == 1, na.rm = TRUE)
+
+  accuracy <- (tp + tn) / (tp + tn + fp + fn)
+  sensitivity <- ifelse(tp + fn == 0, NA, tp / (tp + fn))
+  specificity <- ifelse(tn + fp == 0, NA, tn / (tn + fp))
+  precision <- ifelse(tp + fp == 0, NA, tp / (tp + fp))
+  f1 <- ifelse(is.na(precision) || is.na(sensitivity) || precision + sensitivity == 0,
+               NA, 2 * precision * sensitivity / (precision + sensitivity))
+  auc <- as.numeric(pROC::auc(pROC::roc(y, prob, quiet = TRUE)))
+
+  data.frame(
+    threshold = threshold,
+    AUC = auc,
+    accuracy = accuracy,
+    sensitivity = sensitivity,
+    specificity = specificity,
+    precision = precision,
+    F1 = f1
+  )
+}
+
+best_f1_threshold <- function(y, prob, grid = seq(0.05, 0.95, by = 0.01)) {
+  metrics <- lapply(grid, function(th) classification_metrics(y, prob, th)) |> bind_rows()
+  metrics$threshold[which.max(metrics$F1)]
+}
+
+weather_df <- prepare_weather_project(weather_df)
+```
+
+## 1. Selekcja krokowa forward i backward
+
+```{r selekcja-forward-backward}
+run_stepwise_selection <- function(df, target, predictors = available_predictors(df), cutoff = "2025-01-01") {
+  model_df <- df |>
+    filter(!is.na(.data[[target]])) |>
+    select(all_of(c("train_set", target, predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  full_formula <- reformulate(predictors, response = target)
+  null_formula <- as.formula(paste(target, "~ 1"))
+
+  full_lm <- lm(full_formula, data = train_df)
+  null_lm <- lm(null_formula, data = train_df)
+
+  # Kryterium BIC w funkcji step(): k = log(n)
+  k_bic <- log(nrow(train_df))
+
+  step_forward_bic <- step(
+    null_lm,
+    scope = list(lower = null_formula, upper = full_formula),
+    direction = "forward",
+    trace = 0,
+    k = k_bic
+  )
+
+  step_backward_bic <- step(
+    full_lm,
+    direction = "backward",
+    trace = 0,
+    k = k_bic
+  )
+
+  pred_forward <- predict(step_forward_bic, newdata = test_df)
+  pred_backward <- predict(step_backward_bic, newdata = test_df)
+
+  bind_rows(
+    cbind(model = "step forward BIC", regression_metrics(test_df[[target]], pred_forward)),
+    cbind(model = "step backward BIC", regression_metrics(test_df[[target]], pred_backward))
+  )
+}
+
+run_regsubsets_methods <- function(df, target, predictors = available_predictors(df), nvmax = NULL) {
+  model_df <- df |>
+    filter(!is.na(.data[[target]])) |>
+    select(all_of(c("train_set", target, predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  if (is.null(nvmax)) nvmax <- min(length(predictors), 25)
+
+  evaluate_regsubsets <- function(method) {
+    fit <- leaps::regsubsets(
+      reformulate(predictors, response = target),
+      data = train_df,
+      nvmax = nvmax,
+      method = method
+    )
+    s <- summary(fit)
+
+    chosen <- c(
+      BIC = which.min(s$bic),
+      Cp = which.min(s$cp),
+      AdjR2 = which.max(s$adjr2)
+    )
+
+    bind_rows(lapply(names(chosen), function(criterion) {
+      id <- chosen[[criterion]]
+      vars <- names(which(s$which[id, ]))
+      vars <- setdiff(vars, "(Intercept)")
+      lm_fit <- lm(reformulate(vars, response = target), data = train_df)
+      pred <- predict(lm_fit, newdata = test_df)
+      cbind(
+        method = method,
+        criterion = criterion,
+        n_predictors = length(vars),
+        predictors = paste(vars, collapse = ", "),
+        regression_metrics(test_df[[target]], pred)
+      )
+    }))
+  }
+
+  bind_rows(
+    evaluate_regsubsets("exhaustive"),
+    evaluate_regsubsets("forward"),
+    evaluate_regsubsets("backward")
+  )
+}
+
+# Przykład użycia dla obu zmiennych zależnych:
+predictors_reg <- available_predictors(weather_df)
+
+stepwise_speed <- run_stepwise_selection(weather_df, "wind_speed_10m_next", predictors_reg)
+stepwise_gusts <- run_stepwise_selection(weather_df, "wind_gusts_10m_next", predictors_reg)
+
+regsubsets_speed <- run_regsubsets_methods(weather_df, "wind_speed_10m_next", predictors_reg)
+regsubsets_gusts <- run_regsubsets_methods(weather_df, "wind_gusts_10m_next", predictors_reg)
+
+stepwise_speed
+stepwise_gusts
+regsubsets_speed
+regsubsets_gusts
+```
+
+## 2. glmnet: ridge/lasso oraz regularyzowany Poisson
+
+```{r glmnet-ridge-lasso}
+run_glmnet_regression <- function(df, target, predictors = available_predictors(df), alpha_value = 1) {
+  model_df <- df |>
+    filter(!is.na(.data[[target]])) |>
+    select(all_of(c("train_set", target, predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  mm <- align_model_matrix(train_df, test_df, predictors)
+  y_train <- train_df[[target]]
+  y_test <- test_df[[target]]
+
+  cv_fit <- cv.glmnet(
+    x = mm$x_train,
+    y = y_train,
+    alpha = alpha_value,
+    family = "gaussian",
+    nfolds = 10
+  )
+
+  pred_min <- as.numeric(predict(cv_fit, newx = mm$x_test, s = "lambda.min"))
+  pred_1se <- as.numeric(predict(cv_fit, newx = mm$x_test, s = "lambda.1se"))
+
+  out <- bind_rows(
+    cbind(lambda = "lambda.min", regression_metrics(y_test, pred_min)),
+    cbind(lambda = "lambda.1se", regression_metrics(y_test, pred_1se))
+  )
+
+  list(cv_fit = cv_fit, results = out)
+}
+
+ridge_speed <- run_glmnet_regression(weather_df, "wind_speed_10m_next", predictors_reg, alpha_value = 0)
+lasso_speed <- run_glmnet_regression(weather_df, "wind_speed_10m_next", predictors_reg, alpha_value = 1)
+ridge_gusts <- run_glmnet_regression(weather_df, "wind_gusts_10m_next", predictors_reg, alpha_value = 0)
+lasso_gusts <- run_glmnet_regression(weather_df, "wind_gusts_10m_next", predictors_reg, alpha_value = 1)
+
+ridge_speed$results
+lasso_speed$results
+ridge_gusts$results
+lasso_gusts$results
+```
+
+```{r poisson-lasso}
+make_good_hours_daily <- function(df,
+                                  wind_min = 12,
+                                  wind_max = 40,
+                                  gust_max = 55,
+                                  use_daylight = TRUE,
+                                  predictors = available_predictors(df)) {
+  stopifnot(all(c("date", "wind_speed_10m_next", "wind_gusts_10m_next") %in% names(df)))
+
+  df <- df |>
+    mutate(
+      good_hour_next = wind_speed_10m_next >= wind_min &
+        wind_speed_10m_next <= wind_max &
+        wind_gusts_10m_next <= gust_max
+    )
+
+  if (use_daylight && "is_day_next" %in% names(df)) {
+    df <- df |> mutate(good_hour_next = good_hour_next & is_day_next == 1)
+  }
+
+  num_predictors <- predictors[vapply(df[predictors], is.numeric, logical(1))]
+  num_predictors <- setdiff(num_predictors, c("rok", "dzien_roku", "godzina"))
+
+  df |>
+    filter(!is.na(good_hour_next)) |>
+    group_by(date) |>
+    summarise(
+      good_hours = sum(good_hour_next, na.rm = TRUE),
+      n_hours = n(),
+      datetime = min(datetime),
+      train_set = first(train_set),
+      rok = first(rok),
+      miesiac = first(miesiac),
+      dzien_roku = first(dzien_roku),
+      across(all_of(num_predictors), ~ mean(.x, na.rm = TRUE)),
+      .groups = "drop"
+    ) |>
+    filter(n_hours > 0)
+}
+
+poisson_deviance <- function(y, mu) {
+  mu <- pmax(mu, .Machine$double.eps)
+  term <- ifelse(y == 0, 0, y * log(y / mu))
+  2 * sum(term - (y - mu), na.rm = TRUE)
+}
+
+run_poisson_lasso <- function(daily_df, predictors = available_predictors(daily_df)) {
+  predictors <- predictors[vapply(daily_df[predictors], is.numeric, logical(1))]
+  predictors <- setdiff(predictors, c("rok", "dzien_roku", "godzina"))
+
+  model_df <- daily_df |>
+    select(all_of(c("train_set", "good_hours", predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  mm <- align_model_matrix(train_df, test_df, predictors)
+  y_train <- train_df$good_hours
+  y_test <- test_df$good_hours
+
+  cv_fit <- cv.glmnet(
+    x = mm$x_train,
+    y = y_train,
+    family = "poisson",
+    alpha = 1,
+    nfolds = 10
+  )
+
+  pred_min <- as.numeric(predict(cv_fit, newx = mm$x_test, s = "lambda.min", type = "response"))
+  pred_1se <- as.numeric(predict(cv_fit, newx = mm$x_test, s = "lambda.1se", type = "response"))
+
+  bind_rows(
+    cbind(
+      model = "Poisson lasso lambda.min",
+      regression_metrics(y_test, pred_min),
+      deviance = poisson_deviance(y_test, pred_min)
+    ),
+    cbind(
+      model = "Poisson lasso lambda.1se",
+      regression_metrics(y_test, pred_1se),
+      deviance = poisson_deviance(y_test, pred_1se)
+    )
+  )
+}
+
+daily_good_hours <- make_good_hours_daily(weather_df, predictors = predictors_reg)
+poisson_lasso_results <- run_poisson_lasso(daily_good_hours)
+poisson_lasso_results
+```
+
+## 3. Modele nieliniowe: klasyfikacja logistyczna z wielomianami i GAM
+
+```{r nieliniowa-klasyfikacja}
+add_event_variables <- function(df, speed_threshold_kt = 15, gust_threshold_kt = 25) {
+  kt_to_kmh <- 1.852
+  df |>
+    mutate(
+      wind_speed_10m_next_event = as.integer(wind_speed_10m_next >= speed_threshold_kt * kt_to_kmh),
+      wind_gusts_10m_next_event = as.integer(wind_gusts_10m_next >= gust_threshold_kt * kt_to_kmh)
+    )
+}
+
+run_logistic_poly <- function(df,
+                              target_event,
+                              main_predictor,
+                              other_predictors,
+                              degrees = 2:5) {
+  model_df <- df |>
+    filter(!is.na(.data[[target_event]]), !is.na(.data[[main_predictor]])) |>
+    select(all_of(c("train_set", target_event, main_predictor, other_predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  bind_rows(lapply(degrees, function(d) {
+    rhs <- c(sprintf("poly(%s, %s)", main_predictor, d), other_predictors)
+    form <- as.formula(paste(target_event, "~", paste(rhs, collapse = " + ")))
+    fit <- glm(form, data = train_df, family = binomial)
+
+    prob_train <- predict(fit, newdata = train_df, type = "response")
+    threshold <- best_f1_threshold(train_df[[target_event]], prob_train)
+    prob_test <- predict(fit, newdata = test_df, type = "response")
+
+    cbind(
+      model = paste0("logistic polynomial degree ", d),
+      main_predictor = main_predictor,
+      classification_metrics(test_df[[target_event]], prob_test, threshold)
+    )
+  }))
+}
+
+run_logistic_gam <- function(df,
+                             target_event,
+                             smooth_predictors,
+                             linear_predictors,
+                             k = 6) {
+  predictors <- unique(c(smooth_predictors, linear_predictors))
+
+  model_df <- df |>
+    filter(!is.na(.data[[target_event]])) |>
+    select(all_of(c("train_set", target_event, predictors))) |>
+    na.omit()
+
+  train_df <- model_df |> filter(train_set) |> select(-train_set)
+  test_df <- model_df |> filter(!train_set) |> select(-train_set)
+
+  smooth_terms <- sprintf("s(%s, k = %s)", smooth_predictors, k)
+  rhs <- c(smooth_terms, linear_predictors)
+  form <- as.formula(paste(target_event, "~", paste(rhs, collapse = " + ")))
+
+  fit <- mgcv::gam(form, data = train_df, family = binomial, method = "REML")
+
+  prob_train <- predict(fit, newdata = train_df, type = "response")
+  threshold <- best_f1_threshold(train_df[[target_event]], prob_train)
+  prob_test <- predict(fit, newdata = test_df, type = "response")
+
+  list(
+    fit = fit,
+    results = cbind(
+      model = "logistic GAM",
+      classification_metrics(test_df[[target_event]], prob_test, threshold)
+    )
+  )
+}
+
+weather_df <- add_event_variables(weather_df)
+
+class_predictors <- setdiff(
+  available_predictors(weather_df),
+  c("wind_speed_10m", "wind_gusts_10m", "wind_speed_100m")
+)
+class_predictors <- intersect(class_predictors, names(weather_df))
+
+poly_speed_event <- run_logistic_poly(
+  weather_df,
+  target_event = "wind_speed_10m_next_event",
+  main_predictor = "wind_speed_10m",
+  other_predictors = class_predictors
+)
+
+poly_gust_event <- run_logistic_poly(
+  weather_df,
+  target_event = "wind_gusts_10m_next_event",
+  main_predictor = "wind_gusts_10m",
+  other_predictors = class_predictors
+)
+
+gam_speed_event <- run_logistic_gam(
+  weather_df,
+  target_event = "wind_speed_10m_next_event",
+  smooth_predictors = c("wind_speed_10m", "wind_speed_100m"),
+  linear_predictors = class_predictors,
+  k = 6
+)
+
+gam_gust_event <- run_logistic_gam(
+  weather_df,
+  target_event = "wind_gusts_10m_next_event",
+  smooth_predictors = c("wind_gusts_10m", "wind_speed_10m"),
+  linear_predictors = class_predictors,
+  k = 6
+)
+
+poly_speed_event
+poly_gust_event
+gam_speed_event$results
+gam_gust_event$results
+```
+
+## 4. LMM: ICC i składowe wariancji
+
+```{r lmm-icc}
+icc_lmm <- function(model) {
+  vc <- as.data.frame(lme4::VarCorr(model))
+  var_rows <- vc |> filter(is.na(var2))
+
+  residual_var <- attr(lme4::VarCorr(model), "sc")^2
+  random_total <- sum(var_rows$vcov, na.rm = TRUE)
+  total_var <- random_total + residual_var
+
+  by_component <- var_rows |>
+    transmute(
+      group = grp,
+      term = var1,
+      variance = vcov,
+      ICC_component = vcov / total_var
+    )
+
+  by_group <- by_component |>
+    group_by(group) |>
+    summarise(
+      variance = sum(variance, na.rm = TRUE),
+      ICC_group = variance / total_var,
+      .groups = "drop"
+    )
+
+  list(
+    residual_variance = residual_var,
+    random_total = random_total,
+    total_variance = total_var,
+    by_component = by_component,
+    by_group = by_group
+  )
+}
+
+# Przykład użycia po dopasowaniu modelu LMM:
+# icc_lmm(lmm_speed_best)$by_group
+# icc_lmm(lmm_gusts_best)$by_group
+
+# Jeżeli w środowisku istnieją obiekty modeli LMM, poniższy kod policzy ICC automatycznie.
+lmm_objects <- ls(pattern = "lmm|LMM")
+lmm_objects <- lmm_objects[vapply(lmm_objects, function(x) inherits(get(x), "merMod"), logical(1))]
+
+icc_results <- lapply(lmm_objects, function(obj_name) {
+  out <- icc_lmm(get(obj_name))$by_group
+  out$model <- obj_name
+  out
+})
+
+if (length(icc_results) > 0) {
+  bind_rows(icc_results) |> select(model, everything())
+}
+```
+
+## 5. GLMM: zagregowana odpowiedź dwumianowa
+
+```{r glmm-zagregowany-binomial}
+make_aggregated_binomial <- function(df,
+                                     target_event,
+                                     predictors,
+                                     group_vars = c("rok", "miesiac", "dzien_roku")) {
+  group_vars <- intersect(group_vars, names(df))
+  predictors <- predictors[vapply(df[predictors], is.numeric, logical(1))]
+  predictors <- setdiff(predictors, c("rok", "dzien_roku", "godzina"))
+
+  df |>
+    filter(!is.na(.data[[target_event]])) |>
+    group_by(across(all_of(group_vars))) |>
+    summarise(
+      sukcesy = sum(.data[[target_event]] == 1, na.rm = TRUE),
+      porazki = sum(.data[[target_event]] == 0, na.rm = TRUE),
+      n = sukcesy + porazki,
+      datetime = min(datetime),
+      train_set = first(train_set),
+      across(all_of(predictors), ~ mean(.x, na.rm = TRUE)),
+      .groups = "drop"
+    ) |>
+    filter(n > 0)
+}
+
+fit_aggregated_glmm <- function(agg_df, predictors, random_structure = "(1 | miesiac) + (1 | miesiac:dzien_roku)") {
+  predictors <- predictors[vapply(agg_df[predictors], is.numeric, logical(1))]
+  predictors <- setdiff(predictors, c("rok", "dzien_roku", "godzina"))
+
+  train_df <- agg_df |> filter(train_set) |> na.omit()
+  test_df <- agg_df |> filter(!train_set) |> na.omit()
+
+  rhs <- paste(c(predictors, random_structure), collapse = " + ")
+  form <- as.formula(paste("cbind(sukcesy, porazki) ~", rhs))
+
+  fit <- lme4::glmer(
+    form,
+    data = train_df,
+    family = binomial,
+    control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+  )
+
+  prob_test <- predict(fit, newdata = test_df, type = "response", allow.new.levels = TRUE)
+  y_test <- test_df$sukcesy / test_df$n
+
+  list(
+    fit = fit,
+    test_comparison = test_df |>
+      mutate(
+        prop_mle = sukcesy / n,
+        prop_glmm = prob_test,
+        abs_error = abs(prop_mle - prop_glmm)
+      ),
+    summary_metrics = data.frame(
+      mean_abs_error_prop = mean(abs(y_test - prob_test), na.rm = TRUE),
+      brier_grouped = mean((y_test - prob_test)^2, na.rm = TRUE)
+    )
+  )
+}
+
+agg_speed <- make_aggregated_binomial(
+  weather_df,
+  target_event = "wind_speed_10m_next_event",
+  predictors = predictors_reg
+)
+
+agg_gusts <- make_aggregated_binomial(
+  weather_df,
+  target_event = "wind_gusts_10m_next_event",
+  predictors = predictors_reg
+)
+
+agg_glmm_speed <- fit_aggregated_glmm(agg_speed, predictors_reg)
+agg_glmm_gusts <- fit_aggregated_glmm(agg_gusts, predictors_reg)
+
+agg_glmm_speed$summary_metrics
+agg_glmm_gusts$summary_metrics
+
+# Porównanie surowych estymat MLE z estymatami GLMM dla kilku grup testowych:
+agg_glmm_speed$test_comparison |>
+  select(any_of(c("rok", "miesiac", "dzien_roku")), sukcesy, porazki, n, prop_mle, prop_glmm, abs_error) |>
+  head(20)
+
+agg_glmm_gusts$test_comparison |>
+  select(any_of(c("rok", "miesiac", "dzien_roku")), sukcesy, porazki, n, prop_mle, prop_glmm, abs_error) |>
+  head(20)
+```

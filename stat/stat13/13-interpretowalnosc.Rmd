@@ -1,0 +1,279 @@
+---
+title: "Metody wspierające interpretację modeli"
+output: html_document
+---
+
+Przykłady będą wykorzystywać zbiór danych `Boston`. Wyłączamy z niego losowo 
+4 obserwacje, które będą podlegały interpretacji. Dla tych obserwacji nie
+są też istotne rzeczywiste wartości zmiennej odpowiedzi, bo interpretacje nie do 
+nich się odnoszą.
+
+```{r}
+library(MASS)
+set.seed(2025)
+test <- sample(nrow(Boston), 4)
+test <- c(399, 156, 279, 163)
+Boston_train <- Boston[-test, ]
+Boston_test <- Boston[test, -14]
+Boston_test
+```
+
+Dopasowujemy model o niskiej interpretowalności --- las losowy.
+
+```{r}
+library(randomForest)
+boston_rf <- randomForest(medv ~ ., data = Boston_train)
+boston_rf
+```
+
+## LIME
+
+Stosujemy (uproszczoną) implementację LIME dostępną w pakiecie `iml`.
+Pakiet ten wykorzystuje klasę (poziomu R6) `Predictor`, której obiekty 
+reprezentują dopasowane modele uczenia maszynowego --- pakiet obsługuje
+sporą liczbę metod.
+
+```{r}
+library(iml)
+boston_rf_predictor <- Predictor$new(boston_rf, data = Boston_train, y = "medv")
+boston_rf_predictor |> str()
+```
+
+Interpretujemy predykcję lasu losowego dla pierwszej obserwacji testowej.
+
+```{r}
+Boston_test[1, ]
+```
+
+Modele LIME dopasowywane są przy pomocy klasy `LocalModel`. 
+
+```{r}
+lime_explainer <- LocalModel$new(boston_rf_predictor, x.interest = Boston_test[1, ])
+lime_explainer$results
+```
+
+Wartości w kolumnie `beta` podają wartości współczynników lokalnego modelu
+liniowego (lasso).
+
+Wyjaśnienie polega na określeniu **lokalnego** wpływu poszczególnych predyktorów
+na predykcję modelu odniesienia (u nas lasu losowego). Siłę tego wpływu
+obrazują wartości w kolumnie `effect` (są to iloczyny `beta * x.recoded`).
+
+Wykres pokazujący wpływ (lokalnie) najważniejszych predyktorów.
+
+```{r}
+plot(lime_explainer)
+```
+
+Największy (lokalnie) wpływ **dodatni** na przewidywaną wartość ma zmienna `rm`,
+największy (co do wartości bezwzględnej) wpływ ujemny `ptratio`. 
+Znaczny wpływ ujemny ma też `lstat`. Niska wartość predykcji uzasadniona jest
+tym, że łączny wpływ ujemny przeważa nad dodatnim.
+
+Interpretacja dla trzeciej wartości testowej.
+
+```{r}
+Boston_test[3, ]
+```
+
+Możemy użyć istniejącego obiektu lokalnego modelu.
+
+```{r}
+lime_explainer$explain(Boston_test[3, ])
+lime_explainer$results
+```
+
+I wykres
+
+```{r}
+plot(lime_explainer)
+```
+
+Te same predyktory są najbardziej istotne. Tym razem wpływ dodatni `rm`
+zacznie przewyższa wpływ ujemny `lstat` i `ptratio`.
+
+### Zadanie
+
+Zinterpretuj predykcje dla pozostałych obserwacji testowych.
+
+## Wartości Shapleya
+
+Inną metodę interpretacji modeli *czarnoskrzynkowych* stanowią wartości Shapleya.
+Klasyczną ich implementację znaleźć można w klasie `Shapley` z pakietu `iml`.
+
+Tu interpretacja uwzględnia zawsze wszystkie predyktory. Poniżej wartości
+Shapleya dla pierwszej obserwacji testowej.
+
+```{r}
+shapley_explainer <- Shapley$new(boston_rf_predictor, x.interest = Boston_test[1, ])
+shapley_explainer$results
+```
+
+Wykres obliczonych wartości Shapleya.
+
+```{r}
+plot(shapley_explainer)
+```
+
+Należy pamiętać, że wartości Shapleya nie pokazują efektu zmiennych w otoczeniu danej
+obserwacji. Pokazują natomiast udział poszczególnych zmiennych w tym, że predykcja
+jest poniżej lub powyżej średniej predykcji modelu odniesienia uzyskanej
+na zbiorze treningowym.
+
+Tutaj jak widać wszystkie predyktory miały wkład ujemny, największy `lstat`.
+
+Wartości Shapleya dla trzeciej obserwacji testowej.
+
+```{r}
+shapley_explainer$explain(Boston_test[3, ])
+plot(shapley_explainer)
+```
+
+W tym przypadku pomimo sporego wkładu ujemnego `rm` przeważył wkład dodatni kilku
+predyktorów, spośród których zdecydowanie wyróżnia się `lstat`.
+
+### Zadanie
+
+Oblicz i zinterpretuj wartości Shapleya dla pozostałych obserwacji testowych.
+
+## SHAP
+
+SHAP jest grupą metod realizujących specjalny efektywny sposób estymacji
+wartości Shapleya oraz ich użytecznej agregacji. 
+
+Będziemy korzystać z implemantacji dostępnej w pakiecie `fastshap`. Do 
+wizualizacji użyjemy pakietu `shapviz`.
+
+Estymacja wartości Shapleya może trwać długo, ale `fastshap` może wykorzystać
+dostępną architekturę równoległą (w tym wielordzeniową). W takiej sytuacji
+należy dodatkowo zainstalować pakiety `parallel`, `foreach` i `doParallel`.
+
+Obliczamy estymaty wartości Shapleya dla wszystkich obserwacji testowych.
+Wymaga to użycia odpowiedniej metody funkcji generycznej `fastshap::explain()`.
+Sam pakiet dostarcza takie metody dla modeli liniowych metody najmniejszych
+kwadratów, XGBoost i LightGBM, ale łatwo dostosować domyślną metodę tej
+funkcji ustawiając parametr `pred_wrapper` (szczegóły: `?explain`). W naszym
+wypadku wystarczy ustawić go na funkcję `predict()` (a dokładniej na metodę
+`predict.randomForest()`).
+
+```{r}
+library(fastshap)
+#library(doParallel)
+#registerDoParallel(cores = parallel::detectCores())
+fshap_test <- explain(boston_rf, X = Boston_test, nsim = 25, pred_wrapper = predict)
+fshap_test |> head()
+```
+
+Jeśli chcemy, żeby funkcja `fastshap::explain()` liczyła równolegle należy:
+
+- odkomentować linie 2 i 3 w powyższym kodzie,
+
+- ustawić parametr `parallel` funkcji `explain()` na `TRUE`.
+
+Wtedy można będzie korzystać z większych wartości parametru `nsim`, co jest
+sensowne, bo zwiększa dokładność estymat.
+
+Porównajmy wartości wyliczone przez `iml` i `fastshap` dla trzeciej obserwacji
+testowej.
+
+```{r}
+obs_no <- 3
+shapley_explainer$explain(Boston_test[obs_no, ])
+rbind(shapley_explainer$results$phi, fshap_test[obs_no, ])
+```
+
+Pakiet `shapviz` implementuje kilka metod wizualizacji wartości SHAP.
+Na początku należy dane przekształcić przy pomocy odpowiedniej metody
+funkcji generycznej `shapviz()`. Dla wyników `fastshap::explain()` taka metoda
+jest dostępna.
+
+```{r}
+library(shapviz)
+boston_test_sv <- shapviz(fshap_test, X = Boston_test)
+boston_test_sv |> summary()
+```
+
+Wykres kaskadowy dla pierwszej instancji testowej.
+
+```{r}
+sv_waterfall(boston_test_sv)
+```
+
+Wykres kaskadowy dla trzeciej instancji testowej.
+
+```{r}
+sv_waterfall(boston_test_sv, row_id = 3)
+```
+
+Alternatywnym sposobem wizualizacji tego samego aspektu analizy jest wykres sił.
+
+```{r}
+sv_force(boston_test_sv, row_id = 3)
+```
+
+Interesujące informacje zawierają również wykresy zbiorcze SHAP dla więcej niż
+jednej instancji. Obliczymy teraz estymaty wartości Shapleya dla całego zbioru
+`Boston`.
+
+Najpierw dopasowujemy model na całym zbiorze.
+
+```{r}
+boston_all_rf <- randomForest(medv ~ ., data = Boston)
+boston_all_rf
+```
+
+Następnie obliczamy estymaty SHAP.
+
+```{r}
+fshap_all <- explain(boston_all_rf, X = Boston[-14], nsim = 25, pred_wrapper = predict)
+head(fshap_all)
+```
+
+Możemy teraz zobaczyć wykres ważności predyktorów (oparty o obliczone estymaty,
+a nie o rezultaty algorytmu dopasowania lasu losowego).
+
+```{r}
+boston_all_sv <- shapviz(fshap_all, X = Boston[-14])
+sv_importance(boston_all_sv)
+```
+
+Wykres zależności SHAP jest rodzajem odpowiednika wykresu częściowej zależności.
+Pokazuje on zależność wartości Shapleya od wartości wybranego predyktora.
+
+```{r}
+sv_dependence(boston_all_sv, v = "lstat")
+```
+
+Domyślnie kolor pokazuje zależność od innego predyktora, z którym wybrany
+(tu `lstat`) ma najsilniejszy stopień interakcji (odczytany z modelu jak
+np. dla XGBoost albo estymowany jak tutaj).
+
+Zależność od `rm`.
+
+```{r}
+sv_dependence(boston_all_sv, v = "rm")
+```
+
+Popularnym sposobem zbiorczego obrazowania wartości Shapleya w SHAP jest
+wykres *pszczelego roju* pokazujący jednocześnie:
+
+- ważność predyktorów (oś pionowa),
+
+- wartości Shapleya (oś pozioma),
+
+- wartości predyktora (kolor).
+
+Dodatkowo wykres pokazuje rozkład wartości Shapleya dla danego predyktora.
+
+```{r}
+sv_importance(boston_all_sv, kind = "beeswarm", show_numbers = TRUE)
+```
+
+### Zadania
+
+1. Wykonaj wykresy kaskadowe albo wykresy sił dla pozostałych wartości testowych.
+Porównaj wyniki analizy tych wykresów z wynikami analizy dla LIME i zwykłych
+wartości Shapleya.
+
+2. Wykonaj analizę przy pomocy podanych metod dla wybranego zespołowego modelu
+drzewiastego i klasyfikacji sprzedaży fotelików (zbiór `CarseatsH`).

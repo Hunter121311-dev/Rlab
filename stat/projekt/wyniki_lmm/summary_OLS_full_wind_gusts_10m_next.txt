@@ -36,64 +36,84 @@ Multiple R-squared:  0.9704,	Adjusted R-squared:  0.9704
 F-statistic: 3.954e+05 on 19 and 229179 DF,  p-value: < 2.2e-16
 
 Correlation of Coefficients:
-                       (Intercept) wind_speed_10m_z wind_speed_100m_z wind_gusts_10m_z wind_dir_sin_z wind_dir_cos_z temperature_2m_z relative_humidity_2m_z
-wind_speed_10m_z        0.00                                                                                                                                
-wind_speed_100m_z       0.00       -0.69                                                                                                                    
-wind_gusts_10m_z        0.00       -0.46            -0.11                                                                                                   
-wind_dir_sin_z          0.00       -0.19             0.11              0.11                                                                                 
-wind_dir_cos_z          0.00       -0.15             0.27             -0.12             0.09                                                                
-temperature_2m_z        0.00       -0.23            -0.01             -0.01             0.15           0.07                                                 
-relative_humidity_2m_z  0.00        0.01             0.07              0.02             0.07           0.06           0.74                                  
-dew_point_2m_z          0.00       -0.09            -0.07              0.01            -0.02          -0.07          -0.64            -0.97                 
-apparent_temperature_z  0.00        0.42             0.04              0.00            -0.16           0.00          -0.57             0.10                 
-precipitation_z         0.00        0.05             0.00             -0.17            -0.06          -0.03           0.00            -0.07                 
-cloud_cover_z           0.00       -0.12             0.22             -0.10            -0.02           0.07          -0.06            -0.08                 
-pressure_msl_z          0.00       -0.04             0.01              0.11            -0.09          -0.15           0.03             0.03                 
-shortwave_radiation_z   0.00       -0.28             0.41             -0.23             0.02           0.03           0.03            -0.06                 
-is_day_z                0.00       -0.03             0.12             -0.07             0.00           0.02          -0.02             0.04                 
-sin_dzien_z             0.00        0.31            -0.39              0.02            -0.06          -0.10          -0.12            -0.19                 
-cos_dzien_z             0.00        0.19            -0.21             -0.04            -0.04           0.04          -0.13            -0.19                 
-sin_godzina_z           0.00       -0.02            -0.06              0.09             0.05           0.10          -0.01            -0.09                 
-cos_godzina_z           0.00        0.03            -0.07              0.01            -0.01          -0.02          -0.03            -0.06                 
-polrocze_cieple_z       0.00        0.02            -0.02              0.01            -0.03          -0.03          -0.05            -0.02                 
-                       dew_point_2m_z apparent_temperature_z precipitation_z cloud_cover_z pressure_msl_z shortwave_radiation_z is_day_z sin_dzien_z cos_dzien_z
-wind_speed_10m_z                                                                                                                                                
-wind_speed_100m_z                                                                                                                                               
-wind_gusts_10m_z                                                                                                                                                
-wind_dir_sin_z                                                                                                                                                  
-wind_dir_cos_z                                                                                                                                                  
-temperature_2m_z                                                                                                                                                
-relative_humidity_2m_z                                                                                                                                          
-dew_point_2m_z                                                                                                                                                  
-apparent_temperature_z -0.26                                                                                                                                    
-precipitation_z         0.05          -0.06                                                                                                                     
-cloud_cover_z           0.06           0.00                  -0.10                                                                                              
-pressure_msl_z         -0.01          -0.02                   0.11            0.13                                                                              
-shortwave_radiation_z   0.13          -0.21                   0.09            0.21         -0.04                                                                
-is_day_z               -0.04           0.06                   0.02            0.05         -0.01           0.16                                                 
-sin_dzien_z             0.16           0.06                   0.03           -0.07          0.10          -0.36                 -0.13                           
-cos_dzien_z             0.16           0.06                   0.08           -0.07          0.02          -0.01                  0.17     0.42                  
-sin_godzina_z           0.06          -0.03                   0.03           -0.01         -0.02          -0.07                 -0.10     0.13        0.12      
-cos_godzina_z           0.07          -0.04                   0.06            0.10         -0.01           0.45                  0.73    -0.07        0.27      
-polrocze_cieple_z       0.02           0.04                   0.00            0.02          0.01          -0.02                  0.02     0.00        0.64      
-                       sin_godzina_z cos_godzina_z
-wind_speed_10m_z                                  
-wind_speed_100m_z                                 
-wind_gusts_10m_z                                  
-wind_dir_sin_z                                    
-wind_dir_cos_z                                    
-temperature_2m_z                                  
-relative_humidity_2m_z                            
-dew_point_2m_z                                    
-apparent_temperature_z                            
-precipitation_z                                   
-cloud_cover_z                                     
-pressure_msl_z                                    
-shortwave_radiation_z                             
-is_day_z                                          
-sin_dzien_z                                       
-cos_dzien_z                                       
-sin_godzina_z                                     
-cos_godzina_z          -0.01                      
-polrocze_cieple_z      -0.01          0.01        
+                       (Intercept) wind_speed_10m_z wind_speed_100m_z wind_gusts_10m_z wind_dir_sin_z wind_dir_cos_z
+wind_speed_10m_z        0.00                                                                                        
+wind_speed_100m_z       0.00       -0.69                                                                            
+wind_gusts_10m_z        0.00       -0.46            -0.11                                                           
+wind_dir_sin_z          0.00       -0.19             0.11              0.11                                         
+wind_dir_cos_z          0.00       -0.15             0.27             -0.12             0.09                        
+temperature_2m_z        0.00       -0.23            -0.01             -0.01             0.15           0.07         
+relative_humidity_2m_z  0.00        0.01             0.07              0.02             0.07           0.06         
+dew_point_2m_z          0.00       -0.09            -0.07              0.01            -0.02          -0.07         
+apparent_temperature_z  0.00        0.42             0.04              0.00            -0.16           0.00         
+precipitation_z         0.00        0.05             0.00             -0.17            -0.06          -0.03         
+cloud_cover_z           0.00       -0.12             0.22             -0.10            -0.02           0.07         
+pressure_msl_z          0.00       -0.04             0.01              0.11            -0.09          -0.15         
+shortwave_radiation_z   0.00       -0.28             0.41             -0.23             0.02           0.03         
+is_day_z                0.00       -0.03             0.12             -0.07             0.00           0.02         
+sin_dzien_z             0.00        0.31            -0.39              0.02            -0.06          -0.10         
+cos_dzien_z             0.00        0.19            -0.21             -0.04            -0.04           0.04         
+sin_godzina_z           0.00       -0.02            -0.06              0.09             0.05           0.10         
+cos_godzina_z           0.00        0.03            -0.07              0.01            -0.01          -0.02         
+polrocze_cieple_z       0.00        0.02            -0.02              0.01            -0.03          -0.03         
+                       temperature_2m_z relative_humidity_2m_z dew_point_2m_z apparent_temperature_z precipitation_z
+wind_speed_10m_z                                                                                                    
+wind_speed_100m_z                                                                                                   
+wind_gusts_10m_z                                                                                                    
+wind_dir_sin_z                                                                                                      
+wind_dir_cos_z                                                                                                      
+temperature_2m_z                                                                                                    
+relative_humidity_2m_z  0.74                                                                                        
+dew_point_2m_z         -0.64            -0.97                                                                       
+apparent_temperature_z -0.57             0.10                  -0.26                                                
+precipitation_z         0.00            -0.07                   0.05          -0.06                                 
+cloud_cover_z          -0.06            -0.08                   0.06           0.00                  -0.10          
+pressure_msl_z          0.03             0.03                  -0.01          -0.02                   0.11          
+shortwave_radiation_z   0.03            -0.06                   0.13          -0.21                   0.09          
+is_day_z               -0.02             0.04                  -0.04           0.06                   0.02          
+sin_dzien_z            -0.12            -0.19                   0.16           0.06                   0.03          
+cos_dzien_z            -0.13            -0.19                   0.16           0.06                   0.08          
+sin_godzina_z          -0.01            -0.09                   0.06          -0.03                   0.03          
+cos_godzina_z          -0.03            -0.06                   0.07          -0.04                   0.06          
+polrocze_cieple_z      -0.05            -0.02                   0.02           0.04                   0.00          
+                       cloud_cover_z pressure_msl_z shortwave_radiation_z is_day_z sin_dzien_z cos_dzien_z sin_godzina_z
+wind_speed_10m_z                                                                                                        
+wind_speed_100m_z                                                                                                       
+wind_gusts_10m_z                                                                                                        
+wind_dir_sin_z                                                                                                          
+wind_dir_cos_z                                                                                                          
+temperature_2m_z                                                                                                        
+relative_humidity_2m_z                                                                                                  
+dew_point_2m_z                                                                                                          
+apparent_temperature_z                                                                                                  
+precipitation_z                                                                                                         
+cloud_cover_z                                                                                                           
+pressure_msl_z          0.13                                                                                            
+shortwave_radiation_z   0.21         -0.04                                                                              
+is_day_z                0.05         -0.01           0.16                                                               
+sin_dzien_z            -0.07          0.10          -0.36                 -0.13                                         
+cos_dzien_z            -0.07          0.02          -0.01                  0.17     0.42                                
+sin_godzina_z          -0.01         -0.02          -0.07                 -0.10     0.13        0.12                    
+cos_godzina_z           0.10         -0.01           0.45                  0.73    -0.07        0.27       -0.01        
+polrocze_cieple_z       0.02          0.01          -0.02                  0.02     0.00        0.64       -0.01        
+                       cos_godzina_z
+wind_speed_10m_z                    
+wind_speed_100m_z                   
+wind_gusts_10m_z                    
+wind_dir_sin_z                      
+wind_dir_cos_z                      
+temperature_2m_z                    
+relative_humidity_2m_z              
+dew_point_2m_z                      
+apparent_temperature_z              
+precipitation_z                     
+cloud_cover_z                       
+pressure_msl_z                      
+shortwave_radiation_z               
+is_day_z                            
+sin_dzien_z                         
+cos_dzien_z                         
+sin_godzina_z                       
+cos_godzina_z                       
+polrocze_cieple_z       0.01        
 

@@ -1,0 +1,184 @@
+---
+title: "Boosting - GBM3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+```
+
+## GBM 3
+
+Jest to nowa - rozwinięta, ale nie do końca dopracowana - wersja klasycznego 
+pakietu implementującego boosting gradientowy GBM 
+(nazwa pakietu w R `gbm` - aktualnie nie rozwijany).
+Instalujemy aktualną wersję pakietu z GitHub.
+
+```{r, eval=FALSE}
+remotes::install_github("gbm-developers/gbm3")
+```
+
+### Regresja
+
+Badamy zależność ceny nieruchomości od pozostałych zmiennych ze zbioru
+`Boston`.
+
+Uruchomienie z domyślnymi wartościami parametrów - parametr `distribution`
+lepiej ustawić ręcznie - nawet na wartość domyślną.
+
+```{r}
+library(gbm3)
+medv_gbm3 <- gbmt(medv ~ ., data = Boston, distribution = gbm_dist("Gaussian"))
+medv_gbm3
+```
+
+Wykres błędu treningowego i walidacyjnego (zbiór walidacyjny powstaje ponieważ
+parametr `num_train` obiektu parametrów uczenia jest ustawiony na wartość
+mniejszą niż liczba wierszy w zbiorze danych, patrz `?training_params`).
+
+```{r}
+gbmt_performance(medv_gbm3) |> plot()
+legend("topright", legend = c("Walidacyjny", "Treningowy"), col = c("red", "black"), pch = 20)
+```
+
+Funkcja `summary.GBMFit()` wyznacza ważność predyktorów i (domyślnie) wykonuje
+odpowiedni wykres.
+
+```{r}
+summary(medv_gbm3)
+```
+
+Wykresy częściowej zależności wykonywane są przez funkcję `plot.GBMFit()`.
+
+Zależność od jednego predyktora.
+
+```{r}
+plot(medv_gbm3, var_index = "rm")
+```
+
+Zależność od 2 predyktorów.
+
+```{r}
+plot(medv_gbm3, var_index = c("rm", "lstat"))
+```
+
+Zależność od 3 predyktorów (liczy się długo).
+
+```{r, eval=FALSE}
+plot(medv_gbm3, var_index = c("rm", "lstat", "ptratio"))
+```
+
+Jak widać powyżej GBM3 domyślnie używa 2000 drzew, co w naszym przykładzie nie
+doprowadziło do przeuczenia. Do manipulowania parametrami metody służy
+parametr `train_params` funkcji `gbmt()`. Jego wartością powinien być obiekt
+klasy `GBMTrainParams`. Standardowo takie obiekty konstruuje funkcja
+`training_params()`. Wśród jej parametrów są:
+
+- `num_trees` - liczba drzew w zespole (parametr $M$),
+
+- `interaction_depth` - głębokośc interakcji (parametr $d$),
+
+- `shrinkage` - parametr spowalniający uczenie ($\nu$),
+
+- `num_train` - wielkość faktycznego zbioru treningowego,
+
+- `bag_fraction` - ułamek faktycznego zbioru treningowego stosowany w uczeniu
+pojedynczego drzewa (parametr $\eta$).
+
+Są to też składowe obiektu parametrów. Niestety domyślnie funkcja `training_params()`
+ustawia dla części parametrów wartości **bezpieczne**, ale **nieużyteczne**.
+Bardziej sensowne wartości domyślne ustawia - pośrednio - funkcja `gbmt()`.
+
+Jeśli chcemy zmodyfikować parametry dopasowanego modelu wygodniej jest
+posłużyć się zmodyfikowaną wersją obiektu jego parametrów uruchomieniowych.
+Np. jeśli chcemy uruchomić model jak poprzednio ale dla 10000 drzew można
+to zrobić następująco.
+
+```{r}
+train_params <- medv_gbm3$params
+train_params$num_trees <- 10000
+medv_gbm3_big <- gbmt(medv ~ ., data = Boston, train_params = train_params,
+                      distribution = gbm_dist("Gaussian"))
+medv_gbm3_big
+```
+Wykres błędu
+
+```{r}
+gbmt_performance(medv_gbm3_big) |> plot()
+```
+
+Analogiczny model wykorzystujący do treningu wszystkie dane. Tutaj lepiej
+posłużyć się funkcją `training_params()`. Nie będzie też dostępny błąd
+walidacyjny, można zamiast tego użyć walidacji krzyżowej (parametr `cv_folds`).
+
+```{r}
+train_params2 <- training_params(
+  num_trees = train_params$num_trees,
+  interaction_depth = train_params$interaction_depth,
+  num_train = nrow(Boston),
+  num_features = train_params$num_features
+  )
+medv_gbm3_big_full <- gbmt(medv ~ ., data = Boston, train_params = train_params2,
+                           distribution = gbm_dist("Gaussian"), cv_folds = 10)
+medv_gbm3_big_full
+```
+
+Wykres błędu CV
+
+```{r}
+plot(gbmt_performance(medv_gbm3_big_full))
+```
+
+### Klasyfikacja
+
+Klasyfikujemy sprzedaż fotelików na poziom wysoki i niski.
+
+Dopasowujemy model z wartościami domyślnymi.
+
+```{r}
+csh_gbm3 <- gbmt(High ~ . - Sales, data = CarseatsH, distribution = gbm_dist("Bernoulli"))
+csh_gbm3
+```
+
+Wykres błędu walidacyjnego
+
+```{r}
+gbmt_performance(csh_gbm3) |> plot()
+```
+
+Ważność predyktorów
+
+```{r}
+summary(csh_gbm3)
+```
+
+Wykres częściowej zależności dla jednego predyktora
+
+```{r}
+plot(csh_gbm3, var_index = "Price")
+```
+
+Od 2 predyktorów.
+
+```{r}
+plot(csh_gbm3, var_index = c("Price", "ShelveLoc"))
+```
+
+Tabela pomyłek dla zbioru treningowego.
+
+```{r}
+probs <- predict(csh_gbm3, CarseatsH, n.trees = 2000, type = "response")
+predicted <- ifelse(probs > 0.5, "Yes", "No")
+table(predicted, CarseatsH$High)
+```
+
+Treningowa proporcja błędów
+
+```{r}
+mean(predicted != CarseatsH$High)
+```

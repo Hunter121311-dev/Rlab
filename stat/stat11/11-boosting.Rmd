@@ -1,0 +1,55 @@
+---
+title: "Boosting - wstęp"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Uwaga
+
+**PROSZĘ NIE INSTALOWAĆ AUTOMATYCZNIE PAKIETU `xgboost`**.
+
+Spośród pakietów wykorzystywanych w tych materiałach pakiet
+
+- `gbm3`
+
+w ogóle nie jest dostępny w CRAN, a wersja pakietu
+
+- `xgboost`
+
+dostępna w CRAN jest przestarzała. Odnośniki do instrukcji instalacji są
+podane poniżej. Ważne, żeby **NIE INSTALOWAĆ** `xgboost` przy pomocy
+automatycznego instalatora RStudio.
+
+### Prerekwizyty
+
+Instalacja wspomnianych pakietów wymaga zainstalowania dostępnego w CRAN 
+pakietu `remotes`.
+
+```{r, eval=FALSE}
+install.packages("remotes")
+```
+
+W systemie macOS przed zainstalowaniem GBM3 i XGBoost warto zainstalować bibliotekę
+OpenMP (`libomp`), np. `brew install libomp`.
+
+## Dane
+
+Podobnie jak w poprzednich materiałach wykorzystujemy zbiory danych `Boston`
+
+```{r}
+library(MASS)
+head(Boston)
+```
+
+i zmodyfikowany `Carseats`
+
+```{r}
+library(ISLR)
+CarseatsH <- 
+  Carseats |> 
+  transform(High = factor(ifelse(Sales <= 8, "No", "Yes")))
+head(CarseatsH)
+```

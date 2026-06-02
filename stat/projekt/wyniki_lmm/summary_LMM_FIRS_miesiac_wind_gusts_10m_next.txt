@@ -1,7 +1,10 @@
 Linear mixed model fit by maximum likelihood  ['lmerMod']
-Formula: wind_gusts_10m_next ~ wind_speed_10m_z + wind_speed_100m_z +      wind_gusts_10m_z + wind_dir_sin_z + wind_dir_cos_z + temperature_2m_z +  
-    relative_humidity_2m_z + dew_point_2m_z + apparent_temperature_z +      precipitation_z + cloud_cover_z + pressure_msl_z + shortwave_radiation_z +  
-    is_day_z + sin_dzien_z + cos_dzien_z + sin_godzina_z + cos_godzina_z +      polrocze_cieple_z + (0 + wind_gusts_10m_z | miesiac_f)
+Formula: wind_gusts_10m_next ~ wind_speed_10m_z + wind_speed_100m_z +  
+    wind_gusts_10m_z + wind_dir_sin_z + wind_dir_cos_z + temperature_2m_z +  
+    relative_humidity_2m_z + dew_point_2m_z + apparent_temperature_z +  
+    precipitation_z + cloud_cover_z + pressure_msl_z + shortwave_radiation_z +  
+    is_day_z + sin_dzien_z + cos_dzien_z + sin_godzina_z + cos_godzina_z +  
+    polrocze_cieple_z + (0 + wind_gusts_10m_z | miesiac_f)
    Data: train_data
 Control: control_lmer
 
@@ -42,23 +45,43 @@ cos_godzina_z          -0.304160   0.011971  -25.409
 polrocze_cieple_z      -0.031919   0.011899   -2.683
 
 Correlation of Fixed Effects:
-            (Intr) wnd_s_10_ w__100 wnd_g_10_ wnd_dr_s_ wnd_dr_c_ tmp_2_ rl__2_ dw__2_ appr__ prcpt_ cld_c_ prss__ shrt__ is_dy_ sn_dz_ cs_dz_ sn_gd_ cs_gd_
-wnd_spd_10_  0.018                                                                                                                                          
-wnd_sp_100_ -0.014 -0.686                                                                                                                                   
-wnd_gst_10_  0.009 -0.214    -0.055                                                                                                                         
-wnd_dr_sn_z  0.018 -0.179     0.099  0.053                                                                                                                  
-wnd_dr_cs_z  0.007 -0.146     0.264 -0.055     0.093                                                                                                        
-tmprtr_2m_z -0.029 -0.247    -0.004 -0.009     0.135     0.057                                                                                              
-rltv_hmd_2_ -0.018 -0.001     0.074  0.006     0.062     0.061     0.741                                                                                    
-dw_pnt_2m_z  0.017 -0.081    -0.071  0.006    -0.017    -0.071    -0.640 -0.974                                                                             
-apprnt_tmp_  0.024  0.431     0.038  0.006    -0.152     0.005    -0.587  0.085 -0.241                                                                      
-precipttn_z -0.010  0.045     0.004 -0.080    -0.059    -0.029     0.010 -0.067  0.051 -0.065                                                               
-cloud_cvr_z -0.022 -0.125     0.227 -0.051    -0.030     0.070    -0.051 -0.077  0.053 -0.003 -0.093                                                        
-prssr_msl_z -0.014 -0.045     0.016  0.052    -0.090    -0.148     0.038  0.040 -0.011 -0.025  0.111  0.139                                                 
-shrtwv_rdt_ -0.039 -0.288     0.412 -0.114     0.006     0.028     0.055 -0.040  0.113 -0.227  0.095  0.223 -0.024                                          
-is_day_z     0.000 -0.024     0.119 -0.033    -0.004     0.017    -0.018  0.036 -0.043  0.062  0.016  0.053 -0.006  0.152                                   
-sin_dzien_z  0.036  0.314    -0.393  0.014    -0.047    -0.097    -0.135 -0.195  0.171  0.072  0.026 -0.079  0.091 -0.378 -0.125                            
-cos_dzien_z  0.027  0.194    -0.212 -0.015    -0.031     0.045    -0.143 -0.190  0.166  0.071  0.069 -0.074  0.011 -0.023  0.169  0.428                     
-sin_godzn_z  0.014 -0.018    -0.066  0.044     0.056     0.099    -0.023 -0.092  0.065 -0.019  0.029 -0.014 -0.019 -0.081 -0.096  0.141  0.126              
-cos_godzn_z  0.002  0.034    -0.070  0.006    -0.007    -0.022    -0.029 -0.062  0.069 -0.033  0.064  0.103 -0.009  0.446  0.729 -0.063  0.272 -0.013       
-plrcz_cpl_z  0.009  0.022    -0.016  0.007    -0.030    -0.031    -0.043 -0.024  0.020  0.033 -0.002  0.013  0.009 -0.019  0.014  0.010  0.646 -0.006  0.008
+            (Intr) wnd_s_10_ w__100 wnd_g_10_ wnd_dr_s_ wnd_dr_c_ tmp_2_ rl__2_ dw__2_ appr__ prcpt_ cld_c_ prss__
+wnd_spd_10_  0.018                                                                                                
+wnd_sp_100_ -0.014 -0.686                                                                                         
+wnd_gst_10_  0.009 -0.214    -0.055                                                                               
+wnd_dr_sn_z  0.018 -0.179     0.099  0.053                                                                        
+wnd_dr_cs_z  0.007 -0.146     0.264 -0.055     0.093                                                              
+tmprtr_2m_z -0.029 -0.247    -0.004 -0.009     0.135     0.057                                                    
+rltv_hmd_2_ -0.018 -0.001     0.074  0.006     0.062     0.061     0.741                                          
+dw_pnt_2m_z  0.017 -0.081    -0.071  0.006    -0.017    -0.071    -0.640 -0.974                                   
+apprnt_tmp_  0.024  0.431     0.038  0.006    -0.152     0.005    -0.587  0.085 -0.241                            
+precipttn_z -0.010  0.045     0.004 -0.080    -0.059    -0.029     0.010 -0.067  0.051 -0.065                     
+cloud_cvr_z -0.022 -0.125     0.227 -0.051    -0.030     0.070    -0.051 -0.077  0.053 -0.003 -0.093              
+prssr_msl_z -0.014 -0.045     0.016  0.052    -0.090    -0.148     0.038  0.040 -0.011 -0.025  0.111  0.139       
+shrtwv_rdt_ -0.039 -0.288     0.412 -0.114     0.006     0.028     0.055 -0.040  0.113 -0.227  0.095  0.223 -0.024
+is_day_z     0.000 -0.024     0.119 -0.033    -0.004     0.017    -0.018  0.036 -0.043  0.062  0.016  0.053 -0.006
+sin_dzien_z  0.036  0.314    -0.393  0.014    -0.047    -0.097    -0.135 -0.195  0.171  0.072  0.026 -0.079  0.091
+cos_dzien_z  0.027  0.194    -0.212 -0.015    -0.031     0.045    -0.143 -0.190  0.166  0.071  0.069 -0.074  0.011
+sin_godzn_z  0.014 -0.018    -0.066  0.044     0.056     0.099    -0.023 -0.092  0.065 -0.019  0.029 -0.014 -0.019
+cos_godzn_z  0.002  0.034    -0.070  0.006    -0.007    -0.022    -0.029 -0.062  0.069 -0.033  0.064  0.103 -0.009
+plrcz_cpl_z  0.009  0.022    -0.016  0.007    -0.030    -0.031    -0.043 -0.024  0.020  0.033 -0.002  0.013  0.009
+            shrt__ is_dy_ sn_dz_ cs_dz_ sn_gd_ cs_gd_
+wnd_spd_10_                                          
+wnd_sp_100_                                          
+wnd_gst_10_                                          
+wnd_dr_sn_z                                          
+wnd_dr_cs_z                                          
+tmprtr_2m_z                                          
+rltv_hmd_2_                                          
+dw_pnt_2m_z                                          
+apprnt_tmp_                                          
+precipttn_z                                          
+cloud_cvr_z                                          
+prssr_msl_z                                          
+shrtwv_rdt_                                          
+is_day_z     0.152                                   
+sin_dzien_z -0.378 -0.125                            
+cos_dzien_z -0.023  0.169  0.428                     
+sin_godzn_z -0.081 -0.096  0.141  0.126              
+cos_godzn_z  0.446  0.729 -0.063  0.272 -0.013       
+plrcz_cpl_z -0.019  0.014  0.010  0.646 -0.006  0.008
