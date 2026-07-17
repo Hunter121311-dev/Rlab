@@ -1,4 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"miesiac_f","(Intercept)",NA,0.00155029271096979,0.039373756627604,"wind_gusts_10m_next","LMM RSI-i miesiac"
-"miesiac_f.1","wind_gusts_10m_z",NA,0.0234844879755514,0.153246494170507,"wind_gusts_10m_next","LMM RSI-i miesiac"
-"Residual",NA,NA,5.99020719267382,2.44748997805381,"wind_gusts_10m_next","LMM RSI-i miesiac"

@@ -1,3 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"miesiac_f","wind_speed_10m_z",NA,0.00944701890866251,0.0971957761873555,"wind_speed_10m_next","LMM FIRS miesiac"
-"Residual",NA,NA,3.17883856207505,1.78292976924921,"wind_speed_10m_next","LMM FIRS miesiac"

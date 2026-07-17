@@ -1,4 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"dzien_roku_f","(Intercept)",NA,0.0019130758288229,0.043738722304417,"wind_speed_10m_next","LMM RIFS miesiac plus dzien_roku"
-"miesiac_f","(Intercept)",NA,0.000349327490265575,0.018690304713021,"wind_speed_10m_next","LMM RIFS miesiac plus dzien_roku"
-"Residual",NA,NA,3.18418379376287,1.78442814194432,"wind_speed_10m_next","LMM RIFS miesiac plus dzien_roku"
