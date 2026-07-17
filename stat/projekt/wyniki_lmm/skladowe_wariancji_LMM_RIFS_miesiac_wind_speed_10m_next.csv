@@ -1,3 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"miesiac_f","(Intercept)",NA,0.000410169279606548,0.0202526363618801,"wind_speed_10m_next","LMM RIFS miesiac"
-"Residual",NA,NA,3.18603216884314,1.78494598485308,"wind_speed_10m_next","LMM RIFS miesiac"

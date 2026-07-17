@@ -1,3 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"miesiac_f","wind_gusts_10m_z",NA,0.0230376469230159,0.151781576362271,"wind_gusts_10m_next","LMM FIRS miesiac"
-"Residual",NA,NA,5.99150181935319,2.44775444425154,"wind_gusts_10m_next","LMM FIRS miesiac"

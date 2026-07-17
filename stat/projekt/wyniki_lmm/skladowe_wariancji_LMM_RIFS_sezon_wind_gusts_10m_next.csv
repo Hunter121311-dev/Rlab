@@ -1,3 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"sezon_f","(Intercept)",NA,1.85615478947594e-05,0.00430831148998763,"wind_gusts_10m_next","LMM RIFS sezon"
-"Residual",NA,NA,6.00983104620467,2.45149567533877,"wind_gusts_10m_next","LMM RIFS sezon"

@@ -1,0 +1,12 @@
+name: dashboard__starter
+title: dashboard__starter
+username: dstar
+account: dstar
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17499215
+bundleId: 12116662
+url: https://dstar.shinyapps.io/dashboard__starter/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

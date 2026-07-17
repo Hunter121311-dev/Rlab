@@ -1,3 +1,0 @@
-"grp","var1","var2","vcov","sdcor","target","model"
-"dzien_roku_f","(Intercept)",NA,7.32618967802817,2.70669349539769,"wind_speed_10m_next","LMM RI dzien_roku bez predyktorow"
-"Residual",NA,NA,68.3069759822142,8.26480344486269,"wind_speed_10m_next","LMM RI dzien_roku bez predyktorow"
