@@ -1,3 +1,0 @@
-"wariant","indeks","CP","nsplit","xerror","xstd","limit_1se","target"
-"minimum CV",14,0.000212344280860702,30,0.150877689694224,0.00204264904638887,NA,"wind_gusts_10m_next_event"
-"regula 1SE",10,0.000311438278595697,21,0.152831257078143,0.00205551380242936,0.152920338740613,"wind_gusts_10m_next_event"

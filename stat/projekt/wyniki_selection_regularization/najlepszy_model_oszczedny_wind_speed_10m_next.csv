@@ -1,2 +1,0 @@
-"target","model","liczba_predyktorow","lambda","MSE_train","RMSE_train","MAE_train","R2_train","MSE_test","RMSE_test","MAE_test","R2_test","zmienne"
-"wind_speed_10m_next","Best subset k=3",3,"nie dotyczy",3.24602248867248,1.80167213684191,1.29301429937489,0.957072821825135,3.90444501197039,1.97596685497768,1.40721116138715,0.924225222767289,"wind_speed_10m, wind_gusts_10m, sin_godzina"

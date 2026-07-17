@@ -1,6 +1,0 @@
-START regresja wind_speed_10m_next bagging 2026-05-28 04:44:42
-ntree 500
-workers 12
-mtry 19
-nodesize 10
-
