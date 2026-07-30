@@ -1,6 +1,6 @@
 ---
 title: "Pierwszy raport"
-author: "Twoje imię"
+author: "Damian"
 output: html_document
 ---
 
@@ -23,7 +23,9 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r,problem1}
-# KOD
+wektor <- c(1, 3, 5, 7, 9)
+suma <- sum(wektor)
+suma
 ```
 
 # Problem 2
@@ -40,7 +42,8 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 **Umieść tutaj swój kod i rozwiązanie:**
 
 ```{r,problem2}
-# KOD
+my_dat <- data.frame('1' = c(1:5), '2' = c(6:10))
+my_dat
 ```
 
 # Problem 3 
@@ -54,7 +57,7 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r,problem3}
-# KOD
+summary(my_dat)
 ```
 
 # Problem 4
@@ -72,8 +75,9 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r,problem4}
-# KOD
-
+dat <- drop_na(read.csv("cces_sample.csv"))
+boxplot(dat$faminc_new, xlab="Family Income")
+title(main="Damian s boxplot")
 ```
 
 # Problem 5
@@ -86,8 +90,8 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 **Umieść tutaj swój kod i rozwiązanie:**
  
 ```{r problem5,include=TRUE,echo=TRUE}
-# KOD
-
+dat_2 <- dat[dat$gender == 1 & (dat$region == 1 | dat$region == 2) & dat$marstat == 1 & dat$newsint == 1, ]
+str(dat_2)
 ```
 
 # Problem 6
@@ -98,12 +102,12 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 * Użyj funkcji R, aby utworzyć tabelę częstotliwości odpowiedzi na pytanie, czy respondenci ankiety inwestują na giełdzie.
 
 **Umieść tutaj swój kod i rozwiązanie:**
-
+# table(dat_2$investor)
+# 1  2 
+# 57 18 
 
 ```{r problem6,include=TRUE,echo=TRUE}
-# KOD
-
-  
+table(dat_2$investor)
 ``` 
 
 # Problem 7
@@ -120,8 +124,13 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r problem7,include=TRUE,echo=TRUE}
-# KOD
-
+dat <- dat %>%
+  mutate(
+    tax_cut = recode(CC18_325a, `1` = 1, `2` = 0),
+    corp_cut = recode(CC18_325b, `1` = 1, `2` = 0),
+    tax_scale = tax_cut + corp_cut
+  )
+head(dat$tax_scale, 20)
 ```
 
 # Problem 8
@@ -134,8 +143,7 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r problem8,include=TRUE,echo=TRUE}
-# KOD
-
+table(dat$tax_scale)
 ```
 
 # Problem 9
@@ -148,7 +156,10 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
  
 ```{r problem9}
-# KOD
+dat %>%
+  group_by(region) %>%
+  summarise(mean_approval = mean(CC18_308a, na.rm = TRUE)) %>%
+  round(2)
 
 ```
  
@@ -163,8 +174,16 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r problem10}
-# KOD
-
+dat %>%
+  filter(
+    investor == 2,
+    faminc_new %in% 5:10
+  ) %>%
+  summarise(
+    mean_relig = mean(pew_religimp, na.rm = TRUE),
+    median_relig = median(pew_religimp, na.rm = TRUE),
+    sd_relig = sd(pew_religimp, na.rm = TRUE)
+  )
 ```
 
 # Problem 11
@@ -176,8 +195,13 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 **Umieść tutaj swój kod i rozwiązanie:**
 
 ```{r problem11}
-# KOD
-
+dat %>%
+  summarise(
+    mean_faminc = mean(faminc_new, na.rm = TRUE),
+    median_faminc = median(faminc_new, na.rm = TRUE),
+    sd_faminc = sd(faminc_new, na.rm = TRUE)
+  ) %>%
+  kable()
 ```
 
 # Problem 12
@@ -193,6 +217,9 @@ dat <- drop_na(read.csv("cces_sample.csv"))
 
 
 ```{r problem12,message=FALSE}
-# KOD
-
+qplot(x = pid7, data = dat, geom = "histogram") +
+  labs(
+    x = "Siedmiopunktowa Identyfikacja Partyjna",
+    y = "Liczba"
+  )
 ```
